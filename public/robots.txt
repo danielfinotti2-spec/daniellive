@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /assistir/
+
+# Salas ao vivo não devem ser indexadas: o link é a credencial de acesso.

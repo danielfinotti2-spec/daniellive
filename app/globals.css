@@ -1,0 +1,347 @@
+@import "tailwindcss";
+
+/*
+ * Identidade visual do ScreenLive.
+ *
+ * A estrutura segue a mesma decisão de arquitetura da referência: em vez de
+ * manter centenas de classes `dark:*` espalhadas, repinta-se a própria escala
+ * `zinc` do Tailwind. Um utilitário v4 compila para `var(--color-zinc-950)`,
+ * então toda a paleta escura cabe em poucas linhas e o resto do código escreve
+ * `bg-white dark:bg-zinc-950` sem saber de nada disso.
+ *
+ * A regra de camadas é o ponto central: a página é o elemento mais escuro e
+ * cada camada acima clareia um passo — página, cartão, controle, borda. Sem
+ * isso um painel parece um buraco aberto na página em vez de uma superfície
+ * elevada sobre ela.
+ */
+
+/*
+ * O tema é escolhido por atributo no <html>, não pela media query do sistema:
+ * assim o usuário pode forçar claro ou escuro independentemente do SO. A
+ * preferência de três vias (claro/escuro/sistema) é resolvida em
+ * components/ThemeScript.tsx e components/ThemeToggle.tsx.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-black: #0f0f10 !important;
+
+  /* Azul de transmissão: a cor de "isto está no ar" e a única cor saturada
+     fora dos tons semânticos de erro/aviso. */
+  --broadcast: #2563eb;
+  --broadcast-strong: #1d4ed8;
+  --broadcast-soft: #eff6ff;
+  --broadcast-ring: rgb(37 99 235 / 0.35);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #101014;
+  --foreground: #e9e9ec;
+
+  /* O `!important` é necessário: a declaração clara acima também carrega um, e
+     uma declaração importante vence uma normal de seletor mais específico. */
+  --color-black: #101014 !important;
+  --color-zinc-950: #1a1a1f;
+  --color-zinc-900: #232329;
+  --color-zinc-800: #313139;
+  --color-zinc-700: #43434d;
+
+  --broadcast: #3b82f6;
+  --broadcast-strong: #60a5fa;
+  --broadcast-soft: #172554;
+  --broadcast-ring: rgb(59 130 246 / 0.45);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-broadcast: var(--broadcast);
+  --color-broadcast-strong: var(--broadcast-strong);
+  --color-broadcast-soft: var(--broadcast-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Barras de rolagem finas e discretas em vez do padrão grosso do navegador. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(0 0 0 / 0.35);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(0 0 0 / 0.55);
+}
+
+/* Uma barra preta sumiria sobre fundo escuro: clareia só o bastante para
+   continuar visível. `:root` entra junto do seletor descendente porque o
+   atributo vive no <html>, e é a barra dele que mais aparece. */
+:root[data-theme="dark"],
+[data-theme="dark"] * {
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.25);
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.4);
+}
+
+/* O foco precisa ser sempre visível: esta é uma tela de controles, operada
+   muito por teclado. O anel é desenhado em todas as superfícies. */
+:focus-visible {
+  outline: 2px solid var(--broadcast);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Dentro de uma área com `select-none` (barra de controles), os campos ainda
+   precisam deixar selecionar texto. */
+.select-none :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ------------------------------------------------------------------ vídeo */
+
+/* A área de vídeo é preta porque a faixa de letterbox de uma tela 16:9 numa
+   janela mais larga incomoda menos sobre preto do que sobre cinza. */
+.video-stage {
+  background: #000;
+}
+
+/* ------------------------------------------------------------- animações */
+
+/* O ponto de "ao vivo". Deliberadamente lento: é um sinal de estado, não um
+   alarme, e um pisca-pisca rápido vira ruído depois de alguns minutos. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+/* Anel que respira em volta do indicador de transmissão ativa. */
+@keyframes live-ring {
+  0% {
+    box-shadow: 0 0 0 0 var(--broadcast-ring);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.live-ring {
+  animation: live-ring 2s ease-out infinite;
+}
+
+/* Entrada das barras do equalizador. Cada barra recebe o mesmo keyframe com um
+   atraso diferente, o que uma classe utilitária não consegue expressar. */
+@keyframes eq-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq-bounce 0.9s ease-in-out infinite;
+}
+
+/* Diálogos: 160ms de fundo e 190ms de cartão ficam abaixo do limiar em que o
+   movimento passa a ser lido como espera, que é o que importa numa janela
+   aberta várias vezes seguidas. */
+@keyframes dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dialog-backdrop {
+  animation: dialog-backdrop-in 160ms ease-out;
+}
+
+.dialog-card {
+  animation: dialog-card-in 190ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Gaveta inferior do celular: sobe de baixo, que é de onde ela vem. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheet-enter {
+  animation: sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fade-in 180ms ease-out;
+}
+
+/* Avisos que entram pelo canto. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Varredura de brilho no botão principal da apresentação. */
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-12deg);
+  }
+  55%,
+  100% {
+    transform: translateX(450%) skewX(-12deg);
+  }
+}
+
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.22) 48%,
+    rgb(255 255 255 / 0.32) 50%,
+    rgb(255 255 255 / 0.22) 52%,
+    transparent 70%
+  );
+  animation: shine-sweep 5s ease-in-out infinite;
+}
+
+/* Os esqueletos de carregamento pulsam em vez de rodar, para não competir com
+   o indicador de transmissão. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton {
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+/*
+ * Nada aqui comunica algo que a forma parada já não diga, então movimento é a
+ * primeira coisa a sair para quem pediu menos animação no sistema.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  .live-ring,
+  .eq-bar,
+  .dialog-backdrop,
+  .dialog-card,
+  .sheet-enter,
+  .fade-in,
+  .toast-enter,
+  .skeleton,
+  .shine::after {
+    animation: none;
+  }
+
+  /* O que sobra mantém o destaque parado, em vez de sumir. */
+  .eq-bar {
+    transform: scaleY(0.7);
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

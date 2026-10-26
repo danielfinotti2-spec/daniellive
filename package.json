@@ -1,0 +1,44 @@
+{
+  "name": "screenlive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ScreenLive — compartilhamento de tela pelo navegador, sem instalar nada.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n web,signal -c cyan,magenta \"next dev -p 3000\" \"node server/index.mjs\"",
+    "dev:web": "next dev -p 3000",
+    "dev:signal": "node server/index.mjs",
+    "build": "next build",
+    "start": "concurrently -n web,signal -c cyan,magenta \"next start -p 3000\" \"node server/index.mjs\"",
+    "start:web": "next start -p 3000",
+    "start:signal": "node server/index.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:signaling": "node --test tests/signaling.e2e.mjs",
+    "test:browser": "node tests/browser.e2e.mjs",
+    "test:scenarios": "node tests/scenarios.e2e.mjs",
+    "screenshots": "node tests/screenshots.mjs"
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-icons": "^5.7.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.5.13",
+    "concurrently": "^9.1.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.1",
+    "playwright-core": "^1.64.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

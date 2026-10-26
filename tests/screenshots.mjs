@@ -1,0 +1,123 @@
+/**
+ * Captura imagens das telas para a documentação.
+ *
+ * Sobe um anfitrião real, entra um espectador e fotografa cada estado. As
+ * imagens vão para docs/ e são referenciadas pelo README.
+ *
+ * Executa com: node tests/screenshots.mjs
+ */
+
+import { chromium } from "playwright-core";
+import { mkdirSync } from "node:fs";
+
+const APP = process.env.APP_URL ?? "http://127.0.0.1:3000";
+const CHROME =
+  process.env.CHROME_PATH ?? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const OUT = "docs";
+
+mkdirSync(OUT, { recursive: true });
+
+const browser = await chromium.launch({
+  executablePath: CHROME,
+  headless: true,
+  args: [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--autoplay-policy=no-user-gesture-required",
+    "--use-fake-ui-for-media-stream",
+    "--auto-select-desktop-capture-source=Entire screen",
+    "--auto-select-desktop-capture-source=Tela inteira",
+    "--enable-usermedia-screen-capturing",
+    "--allow-http-screen-capture",
+  ],
+});
+
+const escuro = { colorScheme: "dark" };
+
+try {
+  // ------------------------------------------------------------------ home
+  const homeCtx = await browser.newContext({
+    viewport: { width: 1440, height: 950 },
+    ...escuro,
+  });
+  const home = await homeCtx.newPage();
+  await home.goto(APP, { waitUntil: "networkidle" });
+  await home.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await home.screenshot({ path: `${OUT}/tela-inicial.png` });
+  console.log("docs/tela-inicial.png");
+
+  // -------------------------------------------------------------- como funciona
+  await home.goto(`${APP}/como-funciona`, { waitUntil: "networkidle" });
+  await home.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await home.screenshot({ path: `${OUT}/como-funciona.png`, fullPage: true });
+  console.log("docs/como-funciona.png");
+  await homeCtx.close();
+
+  // ---------------------------------------------------------------- anfitrião
+  const hostCtx = await browser.newContext({
+    viewport: { width: 1440, height: 950 },
+    ...escuro,
+  });
+  const host = await hostCtx.newPage();
+  await host.goto(`${APP}/transmitir`, { waitUntil: "networkidle" });
+  await host.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await host.screenshot({ path: `${OUT}/preparar-transmissao.png` });
+  console.log("docs/preparar-transmissao.png");
+
+  await host.locator("#display-name").fill("Ana");
+  await host.getByRole("button", { name: /criar a sala/i }).click();
+  await host.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
+  const linkTexto = await host.locator("p.font-mono").first().innerText();
+  const code = linkTexto.match(/\/assistir\/([A-Z0-9]{9})/)?.[1];
+  console.log("sala de exemplo:", code);
+
+  // ------------------------------------------------------------ espectador entra
+  const viewerCtx = await browser.newContext({
+    viewport: { width: 1280, height: 820 },
+    ...escuro,
+  });
+  const viewer = await viewerCtx.newPage();
+  await viewer.goto(`${APP}/assistir/${code}`, { waitUntil: "networkidle" });
+  await viewer.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await viewer.waitForTimeout(1500);
+  await viewer.screenshot({ path: `${OUT}/espectador-esperando.png` });
+  console.log("docs/espectador-esperando.png");
+
+  // --------------------------------------------------------------- ao vivo
+  await host.getByRole("button", { name: /compartilhar minha tela/i }).click();
+  await host.waitForSelector("text=/AO VIVO/i", { timeout: 30_000 });
+  await host.waitForTimeout(3000);
+  await host.screenshot({ path: `${OUT}/anfitriao-ao-vivo.png` });
+  console.log("docs/anfitriao-ao-vivo.png");
+
+  await viewer.waitForTimeout(4000);
+  await viewer.screenshot({ path: `${OUT}/espectador-assistindo.png` });
+  console.log("docs/espectador-assistindo.png");
+
+  // ------------------------------------------------------------- celular
+  const mobCtx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    ...escuro,
+  });
+  const mob = await mobCtx.newPage();
+  await mob.goto(APP, { waitUntil: "networkidle" });
+  await mob.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await mob.screenshot({ path: `${OUT}/celular-inicial.png` });
+  console.log("docs/celular-inicial.png");
+
+  await mob.goto(`${APP}/assistir/${code}`, { waitUntil: "networkidle" });
+  await mob.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await mob.waitForTimeout(4000);
+  await mob.screenshot({ path: `${OUT}/celular-assistindo.png` });
+  console.log("docs/celular-assistindo.png");
+
+  await mobCtx.close();
+  await hostCtx.close();
+  await viewerCtx.close();
+} finally {
+  await browser.close();
+}
+
+console.log("\nimagens geradas em docs/");
