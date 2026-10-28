@@ -263,6 +263,9 @@ function handleMessage(ws, state, message) {
         // em que os eventos chegaram.
         hostId: snapshot?.hostId ?? null,
         sharing: snapshot?.sharing ?? false,
+        // A conversa que já rolava: sem isto, entrar tarde era cair num chat
+        // mudo mesmo quando a conversa estava quente.
+        chat: registry.chatHistory(message.code),
       });
 
       // Quem já estava é avisado do recém-chegado. O anfitrião usa isto para
@@ -350,6 +353,25 @@ function handleMessage(ws, state, message) {
 
     case "ping": {
       send(ws, { type: "pong", t: Date.now() });
+      return;
+    }
+
+    case "chat": {
+      const code = state.roomCode;
+      if (!code) {
+        // Falar para sala nenhuma não faz sentido — nem histórico daria.
+        send(ws, { type: "error", code: "sem-sala" });
+        return;
+      }
+      const resultado = registry.appendChat(code, state.id, message.texto);
+      if (!resultado.ok) {
+        send(ws, { type: "error", code: resultado.error });
+        return;
+      }
+      // Vai para todos, inclusive para quem enviou: a confirmação é a própria
+      // mensagem de volta, numerada — o cliente de quem mandou descobre assim
+      // a ordem oficial, e nenhum caso especial precisa existir.
+      broadcast(code, { type: "chat", msg: resultado.mensagem });
       return;
     }
 

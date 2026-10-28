@@ -31,7 +31,21 @@ export type ClientMessage =
   | { type: "sharing"; on: boolean; paused?: boolean }
   | { type: "signal"; to: string; data: SignalPayload }
   | { type: "requestStream" }
+  | { type: "chat"; texto: string }
   | { type: "ping" };
+
+/** Uma mensagem do chat da sala (autor é a sala, não o corpo enviado). */
+export type ChatMessage = {
+  /** Sequencial da sala: a ordem oficial da conversa. */
+  id: number;
+  /** Nome do autor segundo a sala. */
+  de: string;
+  /** Id da conexão do autor — o cliente usa para marcar "você". */
+  deId: string;
+  texto: string;
+  /** Relógio do servidor (epoch ms). */
+  quando: number;
+};
 
 /** Sinal WebRTC: ou uma descrição de sessão, ou um candidato ICE. */
 export type SignalPayload = {
@@ -51,8 +65,11 @@ export type ServerMessage =
       room: RoomSnapshot;
       hostId: string | null;
       sharing: boolean;
+      /** A conversa que já rolava: chega junto com a entrada. */
+      chat: ChatMessage[];
     }
   | { type: "join-error"; code: string; room: string }
+  | { type: "chat"; msg: ChatMessage }
   | { type: "peer-joined"; id: string; name: string; role: Role }
   | { type: "peer-left"; id: string; name: string; timeout?: boolean }
   | { type: "host-changed"; hostId: string; hostName: string }

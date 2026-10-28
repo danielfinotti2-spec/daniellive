@@ -148,6 +148,30 @@ describe("signal", () => {
   });
 });
 
+describe("chat", () => {
+  test("texto simples passa e é aparado", () => {
+    const r = validateMessage({ type: "chat", texto: "  alô, sala  " });
+    assert.deepEqual(r, { ok: true, message: { type: "chat", texto: "alô, sala" } });
+  });
+
+  test("teto de 500 caracteres", () => {
+    assert.equal(validateMessage({ type: "chat", texto: "a".repeat(500) }).ok, true);
+    assert.equal(validateMessage({ type: "chat", texto: "a".repeat(501) }).ok, false);
+  });
+
+  test("vazio, só espaços e não-texto são recusados", () => {
+    assert.equal(validateMessage({ type: "chat", texto: "" }).ok, false);
+    assert.equal(validateMessage({ type: "chat", texto: "   " }).ok, false);
+    assert.equal(validateMessage({ type: "chat", texto: 42 }).ok, false);
+    assert.equal(validateMessage({ type: "chat" }).ok, false);
+  });
+
+  test("campos a mais não atravessam — o autor não se declara no corpo", () => {
+    const r = validateMessage({ type: "chat", texto: "oi", de: "Fingindo ser alguém", deId: "x" });
+    assert.deepEqual(r, { ok: true, message: { type: "chat", texto: "oi" } });
+  });
+});
+
 describe("decode", () => {
   test("aceita JSON válido", () => {
     const res = decode('{"type":"ping"}');

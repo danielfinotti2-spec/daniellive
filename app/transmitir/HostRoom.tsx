@@ -26,6 +26,7 @@ import {
 import { useHost } from "@/lib/useHost";
 import { useAplicativo } from "@/lib/desktop";
 import { VoltarAoInicio } from "@/components/VoltarAoInicio";
+import { SalaChat } from "@/components/SalaChat";
 import { AnimatePresence, ListaViva, ItemVivo } from "@/components/animacao";
 import { preencher, useTexto } from "@/lib/idioma";
 import type { CaptureOptions } from "@/lib/webrtc";
@@ -395,6 +396,13 @@ export function HostRoom() {
               </ListaViva>
             )}
           </CartaoSecao>
+
+          <SalaChat
+            mensagens={host.mensagens}
+            selfId={host.selfId}
+            onEnviar={host.enviarChat}
+            conectado={host.status === "conectado"}
+          />
 
           <Cartao className="p-4">
             <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">

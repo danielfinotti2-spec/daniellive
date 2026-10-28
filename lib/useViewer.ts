@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SignalingClient, type SignalingStatus } from "./signaling";
 import { ViewerPeer, connectionHelp } from "./webrtc";
-import type { Participant, SignalPayload } from "./protocol";
+import type { Participant, SignalPayload, ChatMessage } from "./protocol";
 import { useTexto, useIdioma, dicionario } from "./idioma";
 
 export type ViewerPhase =
@@ -61,6 +61,10 @@ export function useViewer({ code, name }: { code: string; name: string }) {
   const [paused, setPaused] = useState(false);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | null>(null);
   const [attempt, setAttempt] = useState(0);
+  /** A conversa da sala, na ordem oficial do servidor (historico + ao vivo). */
+  const [mensagens, setMensagens] = useState<ChatMessage[]>([]);
+  /** O id desta conexão, devolvido pelo servidor na entrada. */
+  const [selfId, setSelfId] = useState<string | null>(null);
 
   const nameRef = useRef(name);
   useEffect(() => {
@@ -89,6 +93,8 @@ export function useViewer({ code, name }: { code: string; name: string }) {
           hostIdRef.current = message.hostId;
           setSharing(message.sharing);
           setParticipants(message.room?.participants ?? []);
+          setMensagens(message.chat ?? []);
+          setSelfId(message.you?.id ?? null);
           const host = message.room?.participants.find((p) => p.role === "host");
           if (host) setHostName(host.name);
           // Se o anfitrião já está transmitindo, pedimos a oferta; se não,
@@ -160,6 +166,10 @@ export function useViewer({ code, name }: { code: string; name: string }) {
         }
         case "no-host": {
           setPhase("encerrada");
+          break;
+        }
+        case "chat": {
+          setMensagens((atual) => [...atual, message.msg]);
           break;
         }
         case "signal": {
@@ -260,6 +270,13 @@ export function useViewer({ code, name }: { code: string; name: string }) {
     requestStream();
   }, [requestStream]);
 
+  /** Manda uma linha para o chat da sala. */
+  const enviarChat = useCallback((texto: string) => {
+    const limpo = texto.trim();
+    if (!limpo) return;
+    clientRef.current?.send({ type: "chat", texto: limpo });
+  }, []);
+
   return {
     status,
     phase,
@@ -273,5 +290,8 @@ export function useViewer({ code, name }: { code: string; name: string }) {
     connectionState,
     attempt,
     retry,
+    mensagens,
+    selfId,
+    enviarChat,
   };
 }

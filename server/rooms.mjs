@@ -55,6 +55,14 @@ export const MAX_VIEWERS_PER_ROOM = 32;
 export const ROOM_TTL_MS = 6 * 60 * 60 * 1000; // 6 h
 /** Sem batimento por este tempo, a conexão é considerada morta. */
 export const HEARTBEAT_TIMEOUT_MS = 45 * 1000;
+/**
+ * Mensagens de chat lembradas por sala. O histórico existe para quem entra
+ * depois não cair numa conversa sem contexto; o teto é para a memória e o
+ * download de entrada não dependerem de uma madrugada de conversa. E como a
+ * sala é destruída quando esvazia, o histórico morre com ela — é a mesma
+ * regra de "nada fica gravado" do resto do produto.
+ */
+export const MAX_CHAT_HISTORICO = 100;
 
 export class RoomRegistry {
   constructor({ ttlMs = ROOM_TTL_MS, maxViewers = MAX_VIEWERS_PER_ROOM, now = Date.now } = {}) {
@@ -86,6 +94,9 @@ export class RoomRegistry {
       sharing: false,
       // participante -> { id, name, role, isSharing, joinedAt, lastSeen }
       participants: new Map(),
+      // Só texto, autor e hora; no máximo MAX_CHAT_HISTORICO entradas.
+      chat: [],
+      chatSeq: 0,
       emptySince: this.now(),
     };
     this.rooms.set(code, room);
@@ -180,6 +191,37 @@ export class RoomRegistry {
     participant.isSharing = Boolean(sharing);
     room.sharing = Boolean(sharing);
     return { ok: true, room };
+  }
+
+  /**
+   * Guarda e devolve uma mensagem de chat da sala.
+   *
+   * A autoridade sobre quem fala é a conexão (parâmetro `id`), então aqui só
+   * se checa "é participante?". A mensagem carrega o nome atual do autor —
+   * o que a sala conhece — nunca um nome que o cliente tenha mandado junto.
+   */
+  appendChat(code, id, texto) {
+    const room = this.get(code);
+    if (!room) return { ok: false, error: "sala-nao-encontrada" };
+    const participant = room.participants.get(id);
+    if (!participant) return { ok: false, error: "nao-participante" };
+    const limpo = String(texto ?? "").trim();
+    if (!limpo) return { ok: false, error: "texto-vazio" };
+
+    room.chatSeq += 1;
+    const mensagem = { id: room.chatSeq, de: participant.name, deId: id, texto: limpo, quando: this.now() };
+    room.chat.push(mensagem);
+    if (room.chat.length > MAX_CHAT_HISTORICO) {
+      // O mais antigo sai primeiro: quem chega tarde lê o fim da conversa.
+      room.chat.splice(0, room.chat.length - MAX_CHAT_HISTORICO);
+    }
+    return { ok: true, room, mensagem };
+  }
+
+  /** Cópia rasa: o chamador não pode mexer no histórico por acidente. */
+  chatHistory(code) {
+    const room = this.get(code);
+    return room ? [...room.chat] : [];
   }
 
   /** Espectadores que devem receber a oferta WebRTC do anfitrião. */

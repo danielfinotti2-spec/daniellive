@@ -257,6 +257,49 @@ describe("fluxo completo de sinalização", () => {
     viewer.close();
   });
 
+  test("chat chega a todos na ordem e quem entra tarde recebe o histórico", async () => {
+    const host = await new TestClient("chat-host").connect();
+    host.send({ type: "create", name: "Nina" });
+    const sala = await host.next("created");
+
+    const v1 = await new TestClient("chat-v1").connect();
+    v1.send({ type: "join", code: sala.code, name: "Otto" });
+    const joinedV1 = await v1.next("joined");
+    assert.deepEqual(joinedV1.chat, [], "sala nova começa com a conversa vazia");
+
+    // Uma de cada um, na sequência.
+    host.send({ type: "chat", texto: "e aí, gente" });
+    const aqui1 = await host.next("chat");
+    assert.equal(aqui1.msg.de, "Nina");
+    assert.equal(aqui1.msg.texto, "e aí, gente");
+    assert.equal(aqui1.msg.deId, sala.you.id, "autoria vem da conexão");
+    const naV1 = await v1.next("chat");
+    assert.equal(naV1.msg.id, aqui1.msg.id, "os dois lados veem o mesmo número de ordem");
+
+    v1.send({ type: "chat", texto: "alô" });
+    const deVolta = await host.next((m) => m.type === "chat" && m.msg.texto === "alô");
+    assert.ok(deVolta.msg.id > aqui1.msg.id, "a ordem é crescente entre autores");
+
+    // Quem chega depois já lê o que rolou — sem pedir nada.
+    const v2 = await new TestClient("chat-v2").connect();
+    v2.send({ type: "join", code: sala.code, name: "Tarde" });
+    const joinedV2 = await v2.next("joined");
+    assert.equal(joinedV2.chat.length, 2);
+    assert.equal(joinedV2.chat[0].texto, "e aí, gente");
+    assert.equal(joinedV2.chat[1].texto, "alô");
+
+    // Falar fora de sala não vai para lugar nenhum.
+    const fora = await new TestClient("chat-fora").connect();
+    fora.send({ type: "chat", texto: "tem alguém aí?" });
+    const erro = await fora.next("error");
+    assert.equal(erro.code, "sem-sala");
+
+    host.close();
+    v1.close();
+    v2.close();
+    fora.close();
+  });
+
   test("recusa sala inexistente com erro específico", async () => {
     const client = await new TestClient("sozinho").connect();
     client.send({ type: "join", code: "ZZZZZZZZZ" });

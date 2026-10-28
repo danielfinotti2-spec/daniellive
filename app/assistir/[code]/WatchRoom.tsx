@@ -16,6 +16,7 @@ import {
   cx,
 } from "@/components/ui";
 import { useViewer } from "@/lib/useViewer";
+import { SalaChat } from "@/components/SalaChat";
 import { AnimatePresence, ListaViva, ItemVivo } from "@/components/animacao";
 import { preencher, useTexto, type Dicionario } from "@/lib/idioma";
 
@@ -256,6 +257,13 @@ export function WatchRoom({ code }: { code: string }) {
               </ListaViva>
             )}
           </CartaoSecao>
+
+          <SalaChat
+            mensagens={viewer.mensagens}
+            selfId={viewer.selfId}
+            onEnviar={viewer.enviarChat}
+            conectado={viewer.status === "conectado"}
+          />
 
           <CartaoSecao titulo={t.assistir.convidarMaisGente} descricao={t.assistir.envieMesmoLink}>
             <div className="flex flex-col gap-2">

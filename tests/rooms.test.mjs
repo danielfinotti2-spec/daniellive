@@ -11,6 +11,7 @@ import {
   isValidRoomCode,
   HEARTBEAT_TIMEOUT_MS,
   ROOM_TTL_MS,
+  MAX_CHAT_HISTORICO,
 } from "../server/rooms.mjs";
 
 describe("código de sala", () => {
@@ -265,5 +266,69 @@ describe("limpeza", () => {
     now += ROOM_TTL_MS + 1;
     const { removedRooms } = reg.sweep();
     assert.ok(removedRooms.includes(room.code));
+  });
+});
+
+describe("chat da sala", () => {
+  test("guarda e entrega mensagens na ordem, com o autor da sala", () => {
+    let now = 1_000_000;
+    const reg = new RoomRegistry({ now: () => now });
+    const room = reg.create({ hostName: "Nina" });
+    reg.join(room.code, { id: "host", name: "Nina", asHost: true });
+    reg.join(room.code, { id: "v1", name: "Otto" });
+
+    const m1 = reg.appendChat(room.code, "host", "e aí, gente");
+    assert.equal(m1.ok, true);
+    assert.equal(m1.mensagem.de, "Nina", "o nome é o que a sala conhece, não o que o cliente diz");
+    assert.equal(m1.mensagem.deId, "host");
+    now += 5_000;
+    reg.appendChat(room.code, "v1", "alô");
+
+    const hist = reg.chatHistory(room.code);
+    assert.equal(hist.length, 2);
+    assert.equal(hist[0].deId, "host");
+    assert.equal(hist[1].deId, "v1");
+    assert.equal(hist[1].quando, now, "hora é o relógio do servidor");
+    assert.ok(hist[0].id < hist[1].id, "ids crescem na ordem");
+  });
+
+  test("quem não é participante não fala", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create();
+    reg.join(room.code, { id: "host", asHost: true });
+    assert.deepEqual(reg.appendChat(room.code, "fantasma", "oi"), { ok: false, error: "nao-participante" });
+    assert.deepEqual(reg.appendChat("XYT2345BC".slice(0, 9), "host", "oi").ok, false);
+  });
+
+  test("texto vazio é recusado e não conta na numeração", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create();
+    reg.join(room.code, { id: "host", asHost: true });
+    assert.equal(reg.appendChat(room.code, "host", "   ").ok, false);
+    const ok = reg.appendChat(room.code, "host", "primeira de verdade");
+    assert.equal(ok.mensagem.id, 1, "a rejeitada não gasta número");
+  });
+
+  test("o histórico respeita o teto e corta pelas mais antigas", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create();
+    reg.join(room.code, { id: "host", asHost: true });
+    for (let i = 1; i <= MAX_CHAT_HISTORICO + 25; i += 1) {
+      reg.appendChat(room.code, "host", `mensagem ${i}`);
+    }
+    const hist = reg.chatHistory(room.code);
+    assert.equal(hist.length, MAX_CHAT_HISTORICO);
+    assert.equal(hist[0].texto, "mensagem 26", "as 25 mais antigas saíram");
+    assert.equal(hist[hist.length - 1].texto, `mensagem ${MAX_CHAT_HISTORICO + 25}`);
+  });
+
+  test("a cópia devolvida não dá acesso ao histórico real", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create();
+    reg.join(room.code, { id: "host", asHost: true });
+    reg.appendChat(room.code, "host", "oi");
+    const hist = reg.chatHistory(room.code);
+    hist.length = 0;
+    assert.equal(reg.chatHistory(room.code).length, 1, "esvaziar a cópia não apaga o histórico");
   });
 });

@@ -46,6 +46,9 @@ export const COST_BY_TYPE = {
   sharing: 1,
   signal: 1,
   requestStream: 1,
+  // Chat é a porta mais convidativa para spam: custa o dobro de uma ação
+  // comum. Conversa normal nunca chega perto do tecido (~1 msg/s sustentada).
+  chat: 2,
 };
 
 export function costFor(type) {

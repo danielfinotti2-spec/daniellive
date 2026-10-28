@@ -16,6 +16,12 @@ export const PROTOCOL_VERSION = 1;
 export const MAX_MESSAGE_BYTES = 256 * 1024;
 const MAX_NAME = 48;
 const MAX_TEXT = 2000;
+/**
+ * Mensagem de chat: curta, porque é conversa e não documento. 500 caracteres
+ * comporta um parágrafo razoável e frustra apenas abusos (colar um arquivo de
+ * texto inteiro numa sala não é conversar).
+ */
+export const MAX_CHAT = 500;
 
 const isStr = (v, max = MAX_TEXT) => typeof v === "string" && v.length > 0 && v.length <= max;
 const isBool = (v) => typeof v === "boolean";
@@ -109,6 +115,21 @@ const SCHEMAS = {
   /** Espectador pede ao anfitrião que reenvie a oferta (recuperação de conexão). */
   requestStream: {
     validate: () => ({}),
+  },
+
+  /**
+   * Chat da sala. Chega só com o texto: quem enviou é a conexão que mandou —
+   * nunca um campo no corpo. Se a mensagem pudesse dizer "sou Fulano", mentir
+   * nome no chat custaria zero.
+   */
+  chat: {
+    validate: (m) => {
+      if (typeof m.texto !== "string") return null;
+      const texto = m.texto.trim();
+      // O teto conta depois de aparar: 600 espaços + 10 letras continuam sendo
+      // uma mensagem de 10 letras — e "   " não é mensagem nenhuma.
+      return texto.length > 0 && texto.length <= MAX_CHAT ? { texto } : null;
+    },
   },
 
   ping: { validate: () => ({}) },

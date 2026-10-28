@@ -12,7 +12,7 @@ import {
   type CaptureOptions,
   type LocalCapture,
 } from "./webrtc";
-import type { Participant, SignalPayload } from "./protocol";
+import type { Participant, SignalPayload, ChatMessage } from "./protocol";
 import { useIdioma, dicionario } from "./idioma";
 
 export type HostPhase = "criando" | "pronto" | "ao-vivo" | "parado" | "erro";
@@ -112,6 +112,15 @@ export function useHost({ name }: { name: string }) {
    */
   const [pausado, setPausado] = useState(false);
   const [motivoParada, setMotivoParada] = useState<MotivoParada>(null);
+  /** A conversa da sala, na ordem oficial do servidor. */
+  const [mensagens, setMensagens] = useState<ChatMessage[]>([]);
+
+  /** Manda uma linha para o chat da sala. */
+  const enviarChat = useCallback((texto: string) => {
+    const limpo = texto.trim();
+    if (!limpo) return;
+    clientRef.current?.send({ type: "chat", texto: limpo });
+  }, []);
   /**
    * Espelho síncrono de `pausado`.
    *
@@ -350,6 +359,10 @@ export function useHost({ name }: { name: string }) {
           });
           break;
         }
+        case "chat": {
+          setMensagens((atual) => [...atual, message.msg]);
+          break;
+        }
         case "error": {
           const erro = dicionario(idiomaRef.current).erro;
           setError(message.code === "limite-de-salas" ? erro.muitasSalas : erro.operacaoRecusada);
@@ -434,6 +447,8 @@ export function useHost({ name }: { name: string }) {
     error,
     notice,
     localPreview,
+    mensagens,
+    enviarChat,
     hasAudio,
     canCapture,
     options,

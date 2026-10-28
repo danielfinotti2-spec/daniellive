@@ -193,6 +193,16 @@ const ptBR = {
     descricaoApp: "Você escolhe o que compartilhar e recebe o link na hora.",
     descricaoWeb: "Sem conta, sem instalar nada. Você escolhe o que compartilhar.",
   },
+  /** Chat da sala (`components/SalaChat.tsx`): texto da conversa em tempo real. */
+  chat: {
+    titulo: "Chat da sala",
+    dica: "As mensagens somem junto com a sala.",
+    vazio: "Nenhuma mensagem ainda. Diga alô!",
+    placeholder: "Escreva a sua mensagem…",
+    aguardandoConexao: "Conectando à sala…",
+    enviar: "Enviar",
+    voce: "você",
+  },
   /** Palco de vídeo (`components/VideoSurface.tsx`). */
   video: {
     vazio: "Nada sendo transmitido agora",
@@ -694,6 +704,15 @@ const en: Dicionario = {
     descricaoApp: "You pick what to share and get the link right away.",
     descricaoWeb: "No account, nothing to install. You pick what to share.",
   },
+  chat: {
+    titulo: "Room chat",
+    dica: "Messages disappear with the room.",
+    vazio: "No messages yet. Say hi!",
+    placeholder: "Write your message…",
+    aguardandoConexao: "Connecting to the room…",
+    enviar: "Send",
+    voce: "you",
+  },
   video: {
     vazio: "Nothing being streamed right now",
     iniciar: "Click to start the video",
@@ -1122,6 +1141,15 @@ const es: Dicionario = {
   criarTransmissao: {
     descricaoApp: "Tú eliges qué compartir y recibes el enlace al instante.",
     descricaoWeb: "Sin cuenta y sin instalar nada. Tú eliges qué compartir.",
+  },
+  chat: {
+    titulo: "Chat de la sala",
+    dica: "Los mensajes desaparecen con la sala.",
+    vazio: "Aún no hay mensajes. ¡Saluda!",
+    placeholder: "Escribe tu mensaje…",
+    aguardandoConexao: "Conectando a la sala…",
+    enviar: "Enviar",
+    voce: "tú",
   },
   video: {
     vazio: "Nada se está transmitiendo ahora",
