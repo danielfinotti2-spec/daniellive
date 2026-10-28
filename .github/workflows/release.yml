@@ -15,6 +15,11 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Sem isto o GITHUB_TOKEN do job é só de leitura — e publicar na Release
+# falha com "403 Forbidden" bem na hora de subir os instaladores.
+permissions:
+  contents: write
+
 # Uma build de cada vez por tag: duplicatas deixam a release com restos.
 concurrency:
   group: release-${{ github.ref }}
