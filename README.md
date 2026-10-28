@@ -607,6 +607,30 @@ servidor para manter e sem banda de relay no seu host.
 
 ## Implantação
 
+### Render / Railway (hospedagem com porta única)
+
+Hospedagens gerenciadas expõem **uma** porta HTTP. Para elas existe o servidor
+público `server/publico.mjs`: ele serve o site embutido e atende o WebSocket
+na mesma porta, no caminho `/ws` — e o cliente descobre esse endereço sozinho
+(`wss://seu-dominio/ws`), sem variável de build extra.
+
+1. **Render:** Dashboard → **New → Blueprint** → aponte este repositório (o
+   [render.yaml](render.yaml) configura build `npm ci && npm run build` e start
+   `node server/publico.mjs`).
+2. **Depois do primeiro deploy** (quando o Render te dar a URL
+   `https://seu-app.onrender.com`), preencha na aba **Environment**:
+   - `ALLOWED_ORIGINS` = `https://seu-app.onrender.com` — **obrigatória**, sem
+     ela o servidor se recusa a subir em produção de propósito.
+   - `NEXT_PUBLIC_SITE_URL` = a mesma URL — alimenta o redirect do OAuth do
+     Google quando você o ligar.
+3. **Railway:** mesma ideia — start command `node server/publico.mjs`, porta
+   em `PORT` (ele injeta), `ALLOWED_ORIGINS` com o domínio dele.
+
+> **Banco no plano grátis:** o arquivo SQLite funciona, mas é apagado a cada
+> deploy/restart em hospedagem sem volume. O app todo continua funcionando —
+> só contas e amizades zeram. No Render, subir o plano com **disk** (~US$1/mês)
+> e apontar `DANIELLIVE_DB=/var/data/daniellive.db` resolve de vez.
+
 ### Docker
 
 O `Dockerfile` produz uma imagem que roda site e sinalização sob o mesmo processo pai:

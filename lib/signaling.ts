@@ -40,11 +40,15 @@ export function signalingUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:8787";
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.hostname;
-  // Em desenvolvimento o Next roda na 3000 e a sinalização na 8787; com o
-  // site atrás de um proxy que encaminha /ws, o mesmo host serve os dois.
+  // Porta dedicada (desenvolvimento e o caso clássico de duas portas).
   const port = process.env.NEXT_PUBLIC_SIGNAL_PORT?.trim();
   if (port) return `${proto}//${host}:${port}`;
-  return `${proto}//${host}:8787`;
+  // Local sem variável: a sinalização do `npm run dev` vive na 8787.
+  if (host === "localhost" || host === "127.0.0.1") return `${proto}//${host}:8787`;
+  // Hospedagem pública de porta única (Render/Railway): o servidor público
+  // atende o WebSocket na mesma porta HTTPS, no caminho /ws — nada a
+  // configurar no build.
+  return `${proto}//${host}/ws`;
 }
 
 export class SignalingClient {

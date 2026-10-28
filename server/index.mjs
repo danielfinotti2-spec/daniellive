@@ -13,17 +13,33 @@
  * de espectadores por sala em rooms.mjs é o que mantém essa escolha honesta.
  *
  * Execução: `node server/index.mjs` (porta em SIGNAL_PORT, padrão 8787).
+ *
+ * Também exporta `criarSinal()`, a fábrica que `server/publico.mjs` usa para
+ * pendurar o WebSocket no MESMO processo do Next (hospedagem com uma porta
+ * só, como Render/Railway). Executado direto o comportamento é o de sempre:
+ * sobe sozinho na porta dele, como o aplicativo desktop e os testes esperam.
  */
 
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import { WebSocketServer } from "ws";
 import { RoomRegistry, isValidRoomCode } from "./rooms.mjs";
 import { validateMessage, decode, encode, PROTOCOL_VERSION } from "./protocol.mjs";
 import { RateLimiter, RoomCreationLimiter, costFor } from "./ratelimit.mjs";
 
-const PORT = Number(process.env.SIGNAL_PORT ?? 8787);
-const HOST = process.env.SIGNAL_HOST ?? "0.0.0.0";
+/**
+ * Cria o servidor e DEVOLVE as peças; quem escuta e encerra é o chamador.
+ *
+ * Dois modos:
+ *  - `{ httpServer }` omitido: cria um servidor HTTP próprio com /health e
+ *    /metrics e pendura o WebSocket em todos os upgrades dele (clássico).
+ *  - `{ httpServer }` dado: NÃO cria servidor; atende apenas upgrades cujo
+ *    caminho é `caminhoWs` ("/ws" por padrão) e deixa o resto ser tratado
+ *    pelo dono do servidor HTTP (o Next, no modo público).
+ */
+export function criarSinal({ httpServer = null, caminhoWs = "/ws" } = {}) {
+
 const SWEEP_INTERVAL_MS = 15_000;
 /**
  * Origens autorizadas a abrir WebSocket. A lista é o que impede que um site
@@ -65,36 +81,43 @@ const creationLimiter = new RoomCreationLimiter({ perAddress: 10, windowMs: 60_0
 /** id do participante -> estado da conexão */
 const connections = new Map();
 
-const httpServer = createServer((req, res) => {
-  // Endpoint de saúde: usado pelo Docker/orquestrador para saber se o processo
-  // está de pé, e por `npm run test:e2e` para esperar o servidor subir.
-  if (req.url === "/health" || req.url === "/healthz") {
-    const body = JSON.stringify({
-      ok: true,
-      rooms: registry.size,
-      connections: connections.size,
-      uptime: Math.round(process.uptime()),
-    });
-    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    res.end(body);
-    return;
-  }
-  if (req.url === "/metrics") {
-    // Formato de texto simples, sem dependência: é o que um `curl` mostra.
-    const lines = [
-      `daniellive_rooms ${registry.size}`,
-      `daniellive_connections ${connections.size}`,
-    ];
-    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    res.end(lines.join("\n") + "\n");
-    return;
-  }
-  res.writeHead(404, { "content-type": "application/json" });
-  res.end(JSON.stringify({ error: "not_found" }));
-});
+const EMBUTIDO = httpServer !== null;
+
+let proprio = null;
+if (!EMBUTIDO) {
+  proprio = createServer((req, res) => {
+    // Endpoint de saúde: usado pelo Docker/orquestrador para saber se o processo
+    // está de pé, e por `npm run test:e2e` para esperar o servidor subir.
+    if (req.url === "/health" || req.url === "/healthz") {
+      const body = JSON.stringify({
+        ok: true,
+        rooms: registry.size,
+        connections: connections.size,
+        uptime: Math.round(process.uptime()),
+      });
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(body);
+      return;
+    }
+    if (req.url === "/metrics") {
+      // Formato de texto simples, sem dependência: é o que um `curl` mostra.
+      const lines = [
+        `daniellive_rooms ${registry.size}`,
+        `daniellive_connections ${connections.size}`,
+      ];
+      res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+      res.end(lines.join("\n") + "\n");
+      return;
+    }
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+}
 
 const wss = new WebSocketServer({
-  server: httpServer,
+  // Com um servidor emprestado, o roteamento do upgrade é decidido abaixo —
+  // só /ws sobe para WebSocket; o resto (HMR do Next etc.) pertence ao Next.
+  ...(EMBUTIDO ? { noServer: true } : { server: proprio }),
   maxPayload: 256 * 1024,
   // Sem compressão: o payload (SDP/ICE) já é pequeno e compactar abriria
   // espaço para ataques de amplificação em conexão não autenticada.
@@ -112,6 +135,22 @@ const wss = new WebSocketServer({
     done(true);
   },
 });
+
+if (EMBUTIDO) {
+  httpServer.on("upgrade", (req, socket, head) => {
+    let caminho;
+    try {
+      caminho = new URL(req.url ?? "/", "http://localhost").pathname;
+    } catch {
+      socket.destroy();
+      return;
+    }
+    if (caminho !== caminhoWs) return; // upgrade alheio (Next, HMR): deixa quieto
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit("connection", ws, req);
+    });
+  });
+}
 
 function send(ws, message) {
   if (ws.readyState !== ws.OPEN) return;
@@ -431,20 +470,42 @@ function shutdown(signal) {
     }
   }
   wss.close(() => {
-    httpServer.close(() => process.exit(0));
+    if (proprio) proprio.close(() => process.exit(0));
+    else process.exit(0);
   });
   // Rede de segurança: se algo travar no fechamento, sai de qualquer forma.
   setTimeout(() => process.exit(0), 3000).unref();
 }
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+return {
+  httpServer: proprio,
+  wss,
+  registry,
+  connections,
+  /** Conveniência autônoma: instala handlers de sinal e escuta. */
+  ouvir(porta, hospedeiro) {
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    if (!proprio) throw new Error("modo embutido não escuta porta própria");
+    proprio.listen(porta, hospedeiro, () => {
+      log(`sinalização ouvindo em ws://${hospedeiro}:${porta}`);
+      log(`saúde em http://${hospedeiro}:${porta}/health`);
+      if (ALLOWED_ORIGINS.length) log("origens permitidas:", ALLOWED_ORIGINS.join(", "));
+      else log("ALLOWED_ORIGINS vazio: aceitando qualquer origem (só é aceitável fora de produção)");
+    });
+  },
+};
 
-httpServer.listen(PORT, HOST, () => {
-  log(`sinalização ouvindo em ws://${HOST}:${PORT}`);
-  log(`saúde em http://${HOST}:${PORT}/health`);
-  if (ALLOWED_ORIGINS.length) log("origens permitidas:", ALLOWED_ORIGINS.join(", "));
-  else log("ALLOWED_ORIGINS vazio: aceitando qualquer origem (só é aceitável fora de produção)");
-});
+}
 
-export { httpServer, wss, registry };
+/**
+ * Chamado como `node server/index.mjs`: sobe sozinho, como sempre fez.
+ * Importado de outro módulo (server/publico.mjs, testes), fica quieto —
+ * quem importa decide o que criar.
+ */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { httpServer: _sinalHttp, wss: _sinalWss, ouvir } = criarSinal();
+  void _sinalHttp;
+  void _sinalWss;
+  ouvir(Number(process.env.SIGNAL_PORT ?? 8787), process.env.SIGNAL_HOST ?? "0.0.0.0");
+}

@@ -1,0 +1,47 @@
+# Blueprint do DanielLive para o Render — o serviço sobe deste arquivo.
+#
+# O que ele garante:
+#  - Node 22+ (o `node:sqlite` das contas exige);
+#  - build = `npm ci && npm run build` (compila a interface antes de subir);
+#  - start = o servidor PÚBLICO (`server/publico.mjs`): site + WebSocket na
+#    mesma porta, WS no caminho /ws;
+#  - disco persistente para o banco das contas (Render cobra ~US$1/mês por
+#    disco; sem disco as contas zeram a cada deploy/restart — mas o resto
+#    do app todo continua funcionando).
+#
+# Depois de criar (Dashboard → New → Blueprint → aponta este repositório),
+# o Render mostra a URL final (https://seu-app.onrender.com). Coloque-a nos
+# dois `sync: false` abaixo pela aba Environment e salve: ALLOWED_ORIGINS é
+# obrigatório em produção, NEXT_PUBLIC_SITE_URL alimenta o OAuth do Google
+# quando você o ligar.
+
+services:
+  - type: web
+    name: daniellive
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node server/publico.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # OBRIGATÓRIA em produção: sem ela o servidor recusa subir (é a trava
+      # que impede qualquer site de usar esta sinalização às custas dele).
+      # Preencha com a URL que o Render te der, ex.:
+      #   https://daniellive.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Base do redirect do OAuth do Google; usar a mesma URL do serviço.
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      # Banco das contas: no disco (se você o criar) ou na pasta do projeto
+      # (efêmero no plano grátis).
+      - key: DANIELLIVE_DB
+        value: ./dados/daniellive.db
+    # ── Opcional: contas que sobrevivem a deploys (volume ~US$1/mês) ────────
+    # disk:
+    #   name: daniellive-dados
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # … e então DANIELLIVE_DB vira /var/data/daniellive.db
