@@ -91,8 +91,10 @@ const conferir = (nome, cond, det) => {
   });
   conferir("descreve o aplicativo", dl.texto.includes("Baixe o DanielLive"));
   conferir("lista os requisitos", dl.texto.includes("Windows 10 ou 11"));
-  // Enquanto o endereco nao for confirmado, nao pode haver botao levando a lugar nenhum
-  conferir("nao promete download inexistente", dl.temBotaoDesabilitado);
+  // O endereco JA é confirmado (release v1.0.1 publicada no GitHub): tem de
+  // haver um link DE VERDADE para o instalador, não um botão fantasma.
+  const linkSetup = dl.linksExternos.find((href) => href.includes("releases") && href.includes(".exe"));
+  conferir("baixa pelo endereço confirmado do GitHub", !!linkSetup, linkSetup ?? "sem link de release");
   conferir("mostra os tres arquivos previstos", dl.nomesArquivos.length === 3, dl.nomesArquivos.join(", "));
   conferir("oferece a versao web como alternativa", dl.texto.includes("versão web") || dl.texto.includes("versão web"));
 

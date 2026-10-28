@@ -39,14 +39,76 @@ function cadastro(nome, email = `${nome.toLowerCase()}@exemplo.com`) {
 }
 
 describe("banco", () => {
-  test("abre, migra para a versão 1 e disponibiliza as tabelas", () => {
+  test("abre, migra até a versão 2 e disponibiliza as tabelas", () => {
     const db = banco();
     const versao = db.prepare("PRAGMA user_version").get().user_version;
-    assert.equal(versao, 1);
+    assert.equal(versao, 2);
     for (const tabela of ["usuarios", "sessoes", "amizades"]) {
       const linha = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(tabela);
       assert.ok(linha, `tabela ${tabela} deveria existir`);
     }
+    // v2: as colunas de perfil chegaram por migração (banco velho também herda).
+    const colunas = db.prepare("PRAGMA table_info(usuarios)").all().map((c) => c.name);
+    for (const coluna of ["nascimento", "apelido"]) assert.ok(colunas.includes(coluna), `coluna ${coluna}`);
+  });
+});
+
+describe("nascimento e apelido", () => {
+  test("guarda data e apelido quando vieram válidos", () => {
+    const tina = criarUsuario("tina@exemplo.com", "senha-segura-123", "Tina", {
+      nascimento: "2004-03-18",
+      apelido: "Tininha",
+    });
+    assert.equal(tina.ok, true);
+    assert.equal(tina.valor.nascimento, "2004-03-18");
+    assert.equal(tina.valor.apelido, "Tininha");
+  });
+
+  test("recusa data impossível, no futuro e menor de idade", () => {
+    assert.deepEqual(
+      criarUsuario("a1@x.com", "senha-segura-123", "Alguém", { nascimento: "2004-02-31" }),
+      { ok: false, erro: "nascimento_invalida" },
+    );
+    assert.deepEqual(
+      criarUsuario("a2@x.com", "senha-segura-123", "Alguém", { nascimento: "2999-01-01" }),
+      { ok: false, erro: "nascimento_invalida" },
+    );
+    assert.deepEqual(
+      criarUsuario("a3@x.com", "senha-segura-123", "Alguém", { nascimento: "🎂" }),
+      { ok: false, erro: "nascimento_invalida" },
+    );
+    const dezAnosAtras = new Date();
+    dezAnosAtras.setUTCFullYear(dezAnosAtras.getUTCFullYear() - 10);
+    const iso = dezAnosAtras.toISOString().slice(0, 10);
+    assert.deepEqual(
+      criarUsuario("a4@x.com", "senha-segura-123", "Alguém", { nascimento: iso }),
+      { ok: false, erro: "muito_jovem" },
+    );
+  });
+
+  test("aceita exatamente 13 anos", () => {
+    const trezeAnosAtras = new Date();
+    trezeAnosAtras.setUTCFullYear(trezeAnosAtras.getUTCFullYear() - 13);
+    trezeAnosAtras.setUTCDate(trezeAnosAtras.getUTCDate() - 7); // aniversário já passou
+    const r = criarUsuario("treze@exemplo.com", "senha-segura-123", "Treze", {
+      nascimento: trezeAnosAtras.toISOString().slice(0, 10),
+    });
+    assert.equal(r.ok, true, JSON.stringify(r));
+  });
+
+  test("sem nascimento (conta Google) fica nulo e não quebra", () => {
+    const bob = criarUsuario("bob@exemplo.com", "senha-segura-123", "Bob");
+    assert.equal(bob.ok, true);
+    assert.equal(bob.valor.nascimento, null);
+    assert.equal(bob.valor.apelido, null);
+  });
+
+  test("idade é calculada direito", async () => {
+    const { idadeDe } = await import("../lib/idade.ts");
+    assert.equal(idadeDe("2000-01-01", new Date("2026-01-01T00:00:00Z")), 26);
+    assert.equal(idadeDe("2000-06-15", new Date("2026-01-01T00:00:00Z")), 25);
+    assert.equal(idadeDe(null), null);
+    assert.equal(idadeDe("lixo"), null);
   });
 });
 

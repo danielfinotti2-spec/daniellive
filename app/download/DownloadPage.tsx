@@ -37,11 +37,14 @@ export function DownloadPage() {  const t = useTexto();
       </div>
 
       {/* O botão principal fica sozinho e centralizado: é o que a pessoa veio
-          fazer. As outras opções vêm depois, sem competir com ele. */}
+          fazer. As outras opções vêm depois, sem competir com ele. Com o
+          endereço confirmado, o clique já inicia o download do arquivo — a
+          URL "releases/latest/download/<nome>" do GitHub resolve sempre a
+          última versão publicada, sem precisar editar nada a cada release. */}
       <div className="mt-10 flex flex-col items-center">
         {DOWNLOAD.confirmado ? (
           <a
-            href={DOWNLOAD.url}
+            href={`${DOWNLOAD.url}/download/${principal.nome}`}
             className="inline-flex items-center gap-2.5 rounded-xl bg-broadcast px-7 py-3.5 text-base font-semibold text-white shadow-sm transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-broadcast"
           >
             <IconeWindows className="h-4.5 w-4.5" />
@@ -114,12 +117,21 @@ export function DownloadPage() {  const t = useTexto();
               <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                 {textoDoArquivo(t, arquivo).descricao}
               </p>
-              <p className="mt-3 font-mono text-xs text-zinc-500 dark:text-zinc-500">
-                {preencher(t.download.arquivoMeta, {
-                  rotulo: arquivo.nome,
-                  tamanho: arquivo.tamanho,
-                })}
-              </p>
+              {DOWNLOAD.confirmado ? (
+                <a
+                  href={`${DOWNLOAD.url}/download/${arquivo.nome}`}
+                  className="mt-3 inline-flex items-center gap-1.5 font-mono text-xs font-medium text-broadcast hover:underline"
+                >
+                  {arquivo.nome} · {arquivo.tamanho}
+                </a>
+              ) : (
+                <p className="mt-3 font-mono text-xs text-zinc-500 dark:text-zinc-500">
+                  {preencher(t.download.arquivoMeta, {
+                    rotulo: arquivo.nome,
+                    tamanho: arquivo.tamanho,
+                  })}
+                </p>
+              )}
             </Cartao>
           ))}
         </div>

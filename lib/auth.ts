@@ -28,12 +28,14 @@ export type Usuario = {
   id: string;
   email: string;
   nome: string;
+  apelido: string | null;
+  nascimento: string | null;
   provedor: "senha" | "google";
   criadoEm: string;
 };
 
 /** Amizade já aceita, com a parte do amigo pronta para mostrar. */
-export type Amigo = { id: string; nome: string; email: string; relacaoId: number };
+export type Amigo = { id: string; nome: string; apelido: string | null; email: string; relacaoId: number };
 
 /** Pedido pendente recebido: quem pede, e quando. */
 export type PedidoAmizade = { id: number; deId: string; nome: string; email: string; quando: string };
@@ -41,7 +43,8 @@ export type PedidoAmizade = { id: number; deId: string; nome: string; email: str
 export type Resultado<T> =
   | { ok: true; valor: T }
   | { ok: false; erro: "email_invalido" | "senha_curta" | "nome_curto" | "email_em_uso"
-      | "credenciais" | "nao_encontrado" | "pedido_existente" | "voce_mesmo" | "desconhecido" };
+      | "nascimento_invalida" | "muito_jovem" | "credenciais" | "nao_encontrado"
+      | "pedido_existente" | "voce_mesmo" | "desconhecido" };
 
 /* ------------------------------------------------------------ constantes */
 
@@ -78,6 +81,8 @@ function linhaParaUsuario(linha: Record<string, unknown> | undefined): Usuario |
     id: String(linha.id),
     email: String(linha.email),
     nome: String(linha.nome),
+    apelido: linha.apelido == null ? null : String(linha.apelido),
+    nascimento: linha.nascimento == null ? null : String(linha.nascimento),
     provedor: linha.provedor === "google" ? "google" : "senha",
     criadoEm: String(linha.criado_em),
   };
@@ -85,14 +90,60 @@ function linhaParaUsuario(linha: Record<string, unknown> | undefined): Usuario |
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const SENHA_MINIMA = 8;
+/** Idade mínima para criar conta: baixíssima, mas respeita a lei (a conta pode guardar dados). */
+export const IDADE_MINIMA = 13;
 
-/** Cria uma conta de e-mail e senha. */
-export function criarUsuario(email: string, senha: string, nome: string): Resultado<Usuario> {
+/**
+ * Valida a data de nascimento do cadastro.
+ *
+ * Formato esperado: `AAAA-MM-DD` (é o que o `<input type="date">` entrega).
+ * Recusa data que não existe (31/02), data no futuro e idade abaixo do mínimo
+ * — em texto simples, sem concessões: cadastro novo não entra sem idade de
+ * verdade.
+ */
+export function validarNascimento(entrada: string): { ok: true; valor: string } | { ok: false; erro: "nascimento_invalida" | "muito_jovem" } {
+  const limpa = entrada.trim();
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(limpa);
+  if (!partes) return { ok: false, erro: "nascimento_invalida" };
+  const [, anoStr, mesStr, diaStr] = partes;
+  const ano = Number(anoStr);
+  const mes = Number(mesStr);
+  const dia = Number(diaStr);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (Number.isNaN(data.getTime()) || data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) {
+    return { ok: false, erro: "nascimento_invalida" };
+  }
+  const agora = new Date();
+  if (data.getTime() > agora.getTime()) return { ok: false, erro: "nascimento_invalida" };
+  // Idade em anos vazios (sem truque de "anos do futuro"): compara dia/mês.
+  let idade = agora.getUTCFullYear() - ano;
+  const jaFezAniversario =
+    agora.getUTCMonth() + 1 > mes || (agora.getUTCMonth() + 1 === mes && agora.getUTCDate() >= dia);
+  if (!jaFezAniversario) idade -= 1;
+  if (idade < IDADE_MINIMA) return { ok: false, erro: "muito_jovem" };
+  if (idade > 120) return { ok: false, erro: "nascimento_invalida" };
+  return { ok: true, valor: limpa };
+}
+
+/** Cria uma conta de e-mail e senha. Nascimento é obrigatório no cadastro novo. */
+export function criarUsuario(
+  email: string,
+  senha: string,
+  nome: string,
+  opcoes: { nascimento?: string; apelido?: string } = {},
+): Resultado<Usuario> {
   const emailLimpo = email.trim().toLowerCase();
   const nomeLimpo = nome.trim();
+  const apelidoLimpo = opcoes.apelido?.trim() || null;
   if (!EMAIL_RE.test(emailLimpo)) return { ok: false, erro: "email_invalido" };
   if (senha.length < SENHA_MINIMA) return { ok: false, erro: "senha_curta" };
   if (nomeLimpo.length < 2) return { ok: false, erro: "nome_curto" };
+  let nascimento: string | null = null;
+  if (opcoes.nascimento !== undefined) {
+    const checagem = validarNascimento(opcoes.nascimento);
+    if (!checagem.ok) return checagem;
+    nascimento = checagem.valor;
+  }
 
   const db = banco();
   const jaExiste = db.prepare("SELECT id FROM usuarios WHERE email = ?").get(emailLimpo);
@@ -103,13 +154,15 @@ export function criarUsuario(email: string, senha: string, nome: string): Result
     id: randomUUID(),
     email: emailLimpo,
     nome: nomeLimpo,
+    apelido: apelidoLimpo,
+    nascimento,
     provedor: "senha",
     criadoEm: agora(),
   };
   db.prepare(
-    `INSERT INTO usuarios (id, email, nome, senha_hash, sal, provedor, criado_em)
-     VALUES (?, ?, ?, ?, '', 'senha', ?)`,
-  ).run(usuario.id, usuario.email, usuario.nome, hashSenha(senha, sal), usuario.criadoEm);
+    `INSERT INTO usuarios (id, email, nome, apelido, nascimento, senha_hash, sal, provedor, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, '', 'senha', ?)`,
+  ).run(usuario.id, usuario.email, usuario.nome, usuario.apelido, usuario.nascimento, hashSenha(senha, sal), usuario.criadoEm);
   return { ok: true, valor: usuario };
 }
 
@@ -133,6 +186,8 @@ export function buscarOuCriarExterno(email: string, nome: string, provedor: "goo
     id: randomUUID(),
     email: emailLimpo,
     nome: nome.trim() || emailLimpo.split("@")[0],
+    apelido: null,
+    nascimento: null,
     provedor,
     criadoEm: agora(),
   };
@@ -258,15 +313,16 @@ export function desfazer(donoId: string, relacaoId: number): Resultado<null> {
 export function listarAmigos(usuarioId: string): Amigo[] {
   const linhas = banco()
     .prepare(
-      `SELECT a.id AS relacao_id, u.id, u.nome, u.email FROM amizades a
+      `SELECT a.id AS relacao_id, u.id, u.nome, u.apelido, u.email FROM amizades a
          JOIN usuarios u ON u.id = CASE WHEN a.de_id = ? THEN a.para_id ELSE a.de_id END
        WHERE (a.de_id = ? OR a.para_id = ?) AND a.estado = 'aceita'
-       ORDER BY u.nome`,
+       ORDER BY COALESCE(u.apelido, u.nome)`,
     )
     .all(usuarioId, usuarioId, usuarioId) as Array<Record<string, unknown>>;
   return linhas.map((l) => ({
     id: String(l.id),
     nome: String(l.nome),
+    apelido: l.apelido == null ? null : String(l.apelido),
     email: String(l.email),
     relacaoId: Number(l.relacao_id),
   }));

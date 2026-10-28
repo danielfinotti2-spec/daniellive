@@ -63,6 +63,15 @@ const MIGRACOES: Array<readonly string[]> = [
     `CREATE INDEX idx_amizades_para ON amizades(para_id, estado)`,
     `CREATE INDEX idx_amizades_de ON amizades(de_id, estado)`,
   ],
+  [
+    // v2 — perfil mais completo no cadastro: data de nascimento (para
+    // calcular idade) e apelido (como a pessoa prefere ser chamada nas
+    // amizades). Nulos para contas antigas e contas Google — o cadastro
+    // clássico começa a exigi-las, e o próprio Perfil mostra o que falta.
+    `ALTER TABLE usuarios ADD COLUMN nascimento TEXT`,
+    `ALTER TABLE usuarios ADD COLUMN apelido TEXT`,
+    `CREATE INDEX idx_usuarios_nome ON usuarios(apelido)`,
+  ],
 ];
 
 // ---------------------------------------------------------------------------

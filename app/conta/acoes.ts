@@ -22,15 +22,20 @@ import { abrirSessao, fecharSessao, usuarioAtual } from "@/lib/sessao";
 export type EstadoAutenticacao = { erro: string | null };
 export type EstadoAmizades = { erro: string | null; mensagem: string | null };
 
-/** Cria a conta e já entra nela. */
+/** Cria a conta e já entra nela. Nascimento é obrigatório (validado de novo no back). */
 export async function acaoCadastrar(
   _anterior: EstadoAutenticacao,
   dados: FormData,
 ): Promise<EstadoAutenticacao> {
+  const apelidoBruto = String(dados.get("apelido") ?? "").trim();
   const r = criarUsuario(
     String(dados.get("email") ?? ""),
     String(dados.get("senha") ?? ""),
     String(dados.get("nome") ?? ""),
+    {
+      nascimento: String(dados.get("nascimento") ?? ""),
+      apelido: apelidoBruto || undefined,
+    },
   );
   if (!r.ok) return { erro: r.erro };
   await abrirSessao(r.valor.id);

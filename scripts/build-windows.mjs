@@ -28,6 +28,16 @@ import os from "node:os";
 const RAIZ = process.cwd();
 const DIST = path.join(RAIZ, "dist-desktop");
 
+/**
+ * Os instaladores levam a versão do package.json no nome — sempre derivada,
+ * nunca hardcoded: subir a versão do projeto sem mexer aqui é o que deve
+ * acontecer, senão um "1.0.1" no package geraria arquivos chamados "1.0.0".
+ */
+const VERSAO = JSON.parse(readFileSync(path.join(RAIZ, "package.json"), "utf8")).version;
+const NOME_NSIS = `DanielLive-Setup-${VERSAO}.exe`;
+const NOME_MSI = `DanielLive-${VERSAO}.msi`;
+const NOME_PORTATIL = `DanielLive-Portatil-${VERSAO}.exe`;
+
 const VERDE = "\u001b[32m";
 const VERMELHO = "\u001b[31m";
 const AMARELO = "\u001b[33m";
@@ -332,7 +342,7 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
   // incompleto até o fim, parando com um erro explícito em vez de distribuir o
   // arquivo quebrado.
   const TAMANHO_MINIMO_NSIS = 100 * 1024 * 1024; // 100 MB
-  const nsis = path.join(dirDeSaida, "DanielLive-Setup-1.0.0.exe");
+  const nsis = path.join(dirDeSaida, NOME_NSIS);
   const winUnpacked = path.join(dirDeSaida, "win-unpacked");
   const MAX_TENTATIVAS = 3;
 
@@ -382,7 +392,7 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
       );
       // Só o instalador e seu resíduo saem; o MSI e o portátil ficam.
       const { rmSync } = await import("node:fs");
-      for (const f of ["DanielLive-Setup-1.0.0.exe", "DanielLive-Setup-1.0.0.exe.blockmap"]) {
+      for (const f of [NOME_NSIS, `${NOME_NSIS}.blockmap`]) {
         rmSync(path.join(dirDeSaida, f), { force: true });
       }
       continue;
@@ -421,12 +431,12 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
   mkdirSync(DIST, { recursive: true });
 
   const artefatos = [
-    "DanielLive-Setup-1.0.0.exe",
-    "DanielLive-Setup-1.0.0.exe.blockmap",
-    "DanielLive-1.0.0.msi",
-    "DanielLive-1.0.0.msi.blockmap",
-    "DanielLive-Portatil-1.0.0.exe",
-    "DanielLive-Portatil-1.0.0.exe.blockmap",
+    NOME_NSIS,
+    `${NOME_NSIS}.blockmap`,
+    NOME_MSI,
+    `${NOME_MSI}.blockmap`,
+    NOME_PORTATIL,
+    `${NOME_PORTATIL}.blockmap`,
   ];
   for (const a of artefatos) {
     if (existsSync(path.join(dirDeSaida, a))) {
@@ -449,9 +459,9 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
 titulo("6/6  Conferindo os artefatos");
 
 const esperados = [
-  { nome: "DanielLive-Setup-1.0.0.exe", rotulo: "Instalador NSIS (assistente, escolhe a pasta)", min: 100 },
-  { nome: "DanielLive-1.0.0.msi", rotulo: "Pacote MSI (GPO/Intune)", min: 100 },
-  { nome: "DanielLive-Portatil-1.0.0.exe", rotulo: "Versão portátil", min: 50 },
+  { nome: NOME_NSIS, rotulo: "Instalador NSIS (assistente, escolhe a pasta)", min: 100 },
+  { nome: NOME_MSI, rotulo: "Pacote MSI (GPO/Intune)", min: 100 },
+  { nome: NOME_PORTATIL, rotulo: "Versão portátil", min: 50 },
 ];
 
 const gerados = [];
@@ -591,7 +601,7 @@ function lerCabecalhoNsis(b) {
   };
 }
 
-const setup = path.join(DIST, "DanielLive-Setup-1.0.0.exe");
+const setup = path.join(DIST, NOME_NSIS);
 if (existsSync(setup)) {
   const b = readFileSync(setup);
   const cabecalho = lerCabecalhoNsis(b);
@@ -646,7 +656,7 @@ aviso(
 // cabeçalho dizia "desconhecida (4)": o `7za` listou 8588 arquivos e 713 MB
 // descomprimidos, e o `DanielLive.exe` extraído abriu normalmente.
 {
-  const portatil = path.join(DIST, "DanielLive-Portatil-1.0.0.exe");
+  const portatil = path.join(DIST, NOME_PORTATIL);
   const sete = path.join(
     process.env.LOCALAPPDATA ?? "",
     "electron-builder",

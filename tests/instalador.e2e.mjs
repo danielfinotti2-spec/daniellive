@@ -26,18 +26,20 @@
  *   node tests/instalador.e2e.mjs
  *
  * Variáveis:
- *   INSTALADOR  caminho do .exe (padrão: dist-desktop/DanielLive-Setup-1.0.0.exe)
+ *   INSTALADOR  caminho do .exe (padrão: dist-desktop/DanielLive-Setup-<versão>.exe,
+ *               com a versão derivada do package.json)
  *   MANTER      "1" para não desinstalar no fim (útil para inspecionar)
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 const RAIZ = path.resolve(import.meta.dirname, "..");
+const VERSAO = JSON.parse(readFileSync(path.join(RAIZ, "package.json"), "utf8")).version;
 const INSTALADOR = path.resolve(
-  process.env.INSTALADOR ?? path.join(RAIZ, "dist-desktop", "DanielLive-Setup-1.0.0.exe"),
+  process.env.INSTALADOR ?? path.join(RAIZ, "dist-desktop", `DanielLive-Setup-${VERSAO}.exe`),
 );
 const DESTINO = path.join(tmpdir(), "daniellive-teste-instalacao");
 const CHAVE_REGISTRO = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall";

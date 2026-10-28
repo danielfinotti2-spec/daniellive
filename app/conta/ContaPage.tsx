@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * O corpo da conta (cliente): formulários e listas.
@@ -12,7 +12,7 @@
  * tudo traduzido igual ao resto do app.
  */
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   BotaoLink,
   Campo,
@@ -25,6 +25,7 @@ import { BotaoEnvio } from "@/components/BotaoEnvio";
 import { VoltarAoInicio } from "@/components/VoltarAoInicio";
 import { Aparecer, ListaViva, ItemVivo, AnimatePresence } from "@/components/animacao";
 import { preencher, useTexto, useIdioma, type Dicionario } from "@/lib/idioma";
+import { idadeDe, formatoDeNascimento } from "@/lib/idade";
 import type { Amigo, PedidoAmizade, Usuario } from "@/lib/auth";
 import {
   acaoCadastrar,
@@ -92,36 +93,58 @@ export function ContaPage({
 
 /* ------------------------------------------------- sem sessão: entrar/criar */
 
+type Aba = "entrar" | "criar";
+
+/**
+ * As duas portas de entrada em abas: "Criar conta" e "Entrar". Um só cartão,
+ * troca instantânea de formulário — o visitante de primeira viagem cai na
+ * criação (a falta de conta é o motivo de ter chegado aqui), e a aba lembrada
+ * fica para o próximo acesso.
+ */
 function EntradaECadastro({ googleHabilitado }: { googleHabilitado: boolean }) {
   const t = useTexto();
+  const [aba, setAba] = useState<Aba>("criar");
   return (
-    <div className="mt-8 grid gap-4 md:grid-cols-2">
-      <Aparecer>
-        <Cartao className="flex h-full flex-col p-5">
-          <h2 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-            {t.conta.criarTitulo}
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            {t.conta.criarDescricao}
-          </p>
-          <FormularioCadastro />
-          {googleHabilitado && <SeparadorGoogle rotulo={t.conta.criarGoogle} />}
-        </Cartao>
-      </Aparecer>
+    <Aparecer>
+      <Cartao className="mx-auto mt-8 w-full max-w-lg p-5">
+        <div role="tablist" aria-label={t.conta.abasRotulo} className="grid grid-cols-2 gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-900">
+          {(
+            [
+              ["criar", t.conta.criarTitulo],
+              ["entrar", t.conta.entrarTitulo],
+            ] as const
+          ).map(([valor, rotulo]) => {
+            const ativa = aba === valor;
+            return (
+              <button
+                key={valor}
+                type="button"
+                role="tab"
+                aria-selected={ativa}
+                onClick={() => setAba(valor)}
+                className={
+                  ativa
+                    ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-950 shadow-sm transition-all dark:bg-zinc-800 dark:text-zinc-50"
+                    : "rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition-all hover:text-zinc-900 dark:text-zinc-500 dark:hover:text-zinc-200"
+                }
+              >
+                {rotulo}
+              </button>
+            );
+          })}
+        </div>
 
-      <Aparecer atraso={0.06}>
-        <Cartao className="flex h-full flex-col p-5">
-          <h2 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-            {t.conta.entrarTitulo}
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            {t.conta.entrarDescricao}
-          </p>
-          <FormularioEntrar />
-          {googleHabilitado && <SeparadorGoogle rotulo={t.conta.entrarGoogle} />}
-        </Cartao>
-      </Aparecer>
-    </div>
+        <p className="mt-4 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          {aba === "criar" ? t.conta.criarDescricao : t.conta.entrarDescricao}
+        </p>
+
+        {aba === "criar" ? <FormularioCadastro /> : <FormularioEntrar />}
+
+        {googleHabilitado && (
+          <SeparadorGoogle rotulo={aba === "criar" ? t.conta.criarGoogle : t.conta.entrarGoogle} />
+        )}
+      </Cartao>
+    </Aparecer>
   );
 }
 
@@ -149,6 +172,24 @@ function FormularioCadastro() {
           maxLength={64}
           required
           placeholder={t.conta.nomePlaceholder}
+        />
+      </Campo>
+      <Campo label={t.conta.apelido} id="cad-apelido" dica={t.conta.apelidoDica}>
+        <Entrada
+          id="cad-apelido"
+          name="apelido"
+          autoComplete="nickname"
+          maxLength={32}
+          placeholder={t.conta.apelidoPlaceholder}
+        />
+      </Campo>
+      <Campo label={t.conta.nascimento} id="cad-nascimento" dica={t.conta.nascimentoDica}>
+        <Entrada
+          id="cad-nascimento"
+          name="nascimento"
+          type="date"
+          autoComplete="bday"
+          required
         />
       </Campo>
       <Campo label={t.conta.email} id="cad-email">
@@ -255,6 +296,8 @@ function PerfilComAmigos({ dados }: { dados: DadosConta }) {
   const dataEntrada = new Intl.DateTimeFormat(idioma, { dateStyle: "long" }).format(
     new Date(usuario.criadoEm),
   );
+  const idade = idadeDe(usuario.nascimento);
+  const formatoNasc = formatoDeNascimento(usuario.nascimento, idioma);
 
   return (
     <div className="mt-8 flex flex-col gap-4">
@@ -267,17 +310,28 @@ function PerfilComAmigos({ dados }: { dados: DadosConta }) {
               </span>
               <div className="min-w-0">
                 <p className="truncate text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                  {usuario.nome}
+                  {usuario.apelido ?? usuario.nome}
                 </p>
+                {usuario.apelido && usuario.apelido !== usuario.nome && (
+                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{usuario.nome}</p>
+                )}
                 <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{usuario.email}</p>
               </div>
             </div>
-            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-              {preencher(t.conta.membroDesde, { data: dataEntrada })}
-            </p>
-            {usuario.provedor === "google" && (
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{t.conta.provedorGoogle}</p>
-            )}
+            <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p>{preencher(t.conta.membroDesde, { data: dataEntrada })}</p>
+              {formatoNasc && (
+                <p>
+                  {preencher(t.conta.nascidoEm, {
+                    data: formatoNasc,
+                    idade: idade !== null ? String(idade) : "",
+                  })}
+                </p>
+              )}
+              {usuario.provedor === "google" && (
+                <p className="text-zinc-500 dark:text-zinc-500">{t.conta.provedorGoogle}</p>
+              )}
+            </dl>
           </div>
           <form action={acaoSair} className="shrink-0">
             <BotaoEnvio
@@ -365,10 +419,14 @@ function ItemVivoAmigo({ amigo }: { amigo: Amigo }) {
   const t = useTexto();
   const [estado, acao] = useActionState(acaoDesfazer, AMIZ_VAZIA);
   const erro = textoErro(t, estado.erro);
+  const exibicao = amigo.apelido ?? amigo.nome;
   return (
     <ItemVivo chave={amigo.id} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-3 py-2.5 dark:border-zinc-800">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{amigo.nome}</p>
+        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{exibicao}</p>
+        {exibicao !== amigo.nome && (
+          <p className="truncate text-[11px] text-zinc-400 dark:text-zinc-500">{amigo.nome}</p>
+        )}
         <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{amigo.email}</p>
         {erro && <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>}
       </div>

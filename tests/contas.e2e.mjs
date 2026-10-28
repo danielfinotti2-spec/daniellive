@@ -34,13 +34,17 @@ async function esperaTexto(page, texto, timeout = 20_000) {
   await page.waitForSelector(`text=${texto}`, { timeout });
 }
 
-/** Cadastro pelo formulário da aba Conta. */
-async function cadastrar(page, { nome, email, senha }) {
+/** Cadastro pelo formulário da aba Conta (aba "Criar conta" já é o padrão). */
+async function cadastrar(page, { nome, email, senha, nascimento = "2004-03-18", apelido = "" }) {
   await page.goto(`${APP}/conta`, { waitUntil: "domcontentloaded" });
+  // O formulário de criar é quem abre; a aba também é um botão com o mesmo
+  // nome do envio — então alvo do clique é o botão DENTRO do formulário.
   await page.locator("#cad-nome").fill(nome);
+  if (apelido) await page.locator("#cad-apelido").fill(apelido);
+  await page.locator("#cad-nascimento").fill(nascimento);
   await page.locator("#cad-email").fill(email);
   await page.locator("#cad-senha").fill(senha);
-  await page.getByRole("button", { name: /^Criar conta$/ }).click();
+  await page.locator('form:has(#cad-nome) >> role=button[name="Criar conta"]').click();
   await esperaTexto(page, "Membro desde");
 }
 
@@ -89,9 +93,10 @@ try {
   const pageE = await ctxE.newPage();
   await pageE.goto(`${APP}/conta`, { waitUntil: "domcontentloaded" });
   await pageE.locator("#cad-nome").fill("Ana Imitação");
+  await pageE.locator("#cad-nascimento").fill("2004-03-18");
   await pageE.locator("#cad-email").fill(A.email);
   await pageE.locator("#cad-senha").fill("qualquer-outra-1");
-  await pageE.getByRole("button", { name: /^Criar conta$/ }).click();
+  await pageE.locator('form:has(#cad-nome) >> role=button[name="Criar conta"]').click();
   try {
     await esperaTexto(pageE, "já tem uma conta", 15_000);
     registrar("duplicata de e-mail explica que já existe conta", true);
@@ -105,16 +110,31 @@ try {
   await pageE.evaluate(() => {
     // O novalidate é necessário: o navegador seguraria o submit antes do
     // servidor, e o que queremos medir é a resposta do servidor.
-    document.querySelector('form[action="app/conta"]')?.removeAttribute("novalidate");
     const f = document.querySelector("#cad-senha")?.closest("form");
     f?.setAttribute("novalidate", "novalidate");
   });
-  await pageE.getByRole("button", { name: /^Criar conta$/ }).click();
+  await pageE.locator('form:has(#cad-nome) >> role=button[name="Criar conta"]').click();
   try {
     await esperaTexto(pageE, "pelo menos 8 caracteres", 15_000);
     registrar("senha curta recusada com motivo", true);
   } catch {
     registrar("senha curta recusada com motivo", false, "sem mensagem");
+  }
+
+  // Menor de 13 anos também é barrado pelo servidor com motivo claro.
+  await pageE.locator("#cad-nome").fill("Jovem Demais");
+  await pageE.locator("#cad-email").fill(`jovem.${rodada}@teste.com`);
+  await pageE.locator("#cad-senha").fill("senha-forte-123");
+  const ontem = new Date(Date.now() - 86400000);
+  await pageE.locator("#cad-nascimento").fill(
+    new Date(ontem.setUTCFullYear(ontem.getUTCFullYear() - 10)).toISOString().slice(0, 10),
+  );
+  await pageE.locator('form:has(#cad-nome) >> role=button[name="Criar conta"]').click();
+  try {
+    await esperaTexto(pageE, "pelo menos 13 anos", 15_000);
+    registrar("menor de idade recusado com motivo", true);
+  } catch {
+    registrar("menor de idade recusado com motivo", false, "sem mensagem");
   }
   await ctxE.close();
 
@@ -167,10 +187,14 @@ try {
     registrar("sair volta para os formulários", false, "continua logada");
   }
 
+  // Depois do logout a aba ativa é a de criar; a de entrar precisa de um clique.
+  await pageA.getByRole("tab", { name: /^Entrar$/ }).click();
+  await pageA.locator("#ent-email").waitFor({ state: "visible", timeout: 5_000 });
+
   // Senha errada é recusada com motivo claro.
   await pageA.locator("#ent-email").fill(A.email);
   await pageA.locator("#ent-senha").fill("senha-errada-1");
-  await pageA.getByRole("button", { name: /^Entrar$/ }).click();
+  await pageA.locator('form:has(#ent-email) >> role=button[name="Entrar"]').click();
   try {
     await esperaTexto(pageA, "E-mail ou senha errados.", 15_000);
     registrar("senha errada explica sem vazar qual dos dois", true);
@@ -181,10 +205,18 @@ try {
   // Senha certa entra — e os amigos continuam lá, porque estão no banco.
   await pageA.locator("#ent-email").fill(A.email);
   await pageA.locator("#ent-senha").fill(A.senha);
-  await pageA.getByRole("button", { name: /^Entrar$/ }).click();
+  await pageA.locator('form:has(#ent-email) >> role=button[name="Entrar"]').click();
   await esperaTexto(pageA, "Membro desde", 15_000);
   const voltaram = await pageA.locator("li").filter({ hasText: B.email }).count();
   registrar("login traz a conta com as amizades do banco", voltaram >= 1, `${voltaram} amigo(s)`);
+
+  // O perfil mostra a idade calculada da data de nascimento do cadastro.
+  try {
+    await esperaTexto(pageA, "anos", 8_000);
+    registrar("perfil mostra a idade da data de nascimento", true);
+  } catch {
+    registrar("perfil mostra a idade da data de nascimento", false, "sem 'anos' no perfil");
+  }
 
   // ============================================================ CHAT
   // Anfitrião abre sala (com a captura falsa do Chrome de teste) e conversa

@@ -355,14 +355,16 @@ try {
   // um arquivo truncado.
   const semSessaoGrafica = process.env.CI === "true" || process.env.SEM_INSTALADOR_NSIS === "1";
 
+  // Nomes derivados do package.json: a versão sobe e o teste segue junto.
+  const versao = JSON.parse(readFileSync(path.join(RAIZ, "package.json"), "utf8")).version;
   for (const [rotulo, arquivo, minimoMB, opcional] of [
     // Os mínimos acompanham o conteúdo real do pacote (interface compilada +
     // sinalização + runtime): hoje ~190 MB no NSIS/MSI e ~150 MB no portátil.
     // O limite existe para pegar um instalador TRUNCADO (a primeira passada
     // do NSIS gera ~300 KB), então mantém folga abaixo do valor medido.
-    ["o instalador MSI", "DanielLive-1.0.0.msi", 170, false],
-    ["o instalador NSIS", "DanielLive-Setup-1.0.0.exe", 170, semSessaoGrafica],
-    ["o executável portátil", "DanielLive-Portatil-1.0.0.exe", 135, semSessaoGrafica],
+    ["o instalador MSI", `DanielLive-${versao}.msi`, 170, false],
+    ["o instalador NSIS", `DanielLive-Setup-${versao}.exe`, 170, semSessaoGrafica],
+    ["o executável portátil", `DanielLive-Portatil-${versao}.exe`, 135, semSessaoGrafica],
   ]) {
     const p = path.join(RAIZ, "dist-desktop", arquivo);
     if (!existsSync(p)) {
