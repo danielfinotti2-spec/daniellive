@@ -3,11 +3,14 @@ name: Release
 # Monta os instaladores do Windows e publica uma GitHub Release.
 #
 # Dois gatilhos:
-#   - tag no formato v* (v1.0.0, v1.1.0…) — é o fluxo normal de lançamento;
-#   - workflow_dispatch — para gerar artefatos de teste sem subir versão
-#     (publica numa release marcada "prerelease" com o nome do SHA).
+#   - tag no formato v* (v1.0.0, v1.1.0…) — monta E publica na Release;
+#   - workflow_dispatch — só confere que o build passa, sem publicar nada.
 #
-# Por que windows-latest: o teste alvo é o Windows e o NSIS/MSI só compilam lá.
+# Por que `npm run build:desktop` em vez de `npx electron-builder` direto:
+# é o mesmo comando validado na máquina de desenvolvimento — inclui geração
+# do ícone, lint, tipos, testes unitários e o empacotamento em pasta
+# temporária (sem o estágio temporário, o NSIS não termina de montar no
+# agente de CI e o instalador some do dist-desktop/).
 
 on:
   push:
@@ -44,24 +47,51 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      # A interface precisa estar compilada ANTES do empacotamento: o
-      # electron-builder embarca `.next/` pronta, não roda o build.
-      - name: Compilar a interface
-        run: npm run build
-
-      # electron-builder publica direto na GitHub Release quando há GH_TOKEN:
-      # sem ele, o --publish nunca teria acesso para subir os arquivos.
+      # Já compila a interface (.next/) internamente — é o passo 4/6 dele.
       - name: Montar os instaladores
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:desktop
 
-      # --- Validação barata antes de entregar --------------------------------
-      # Um instalador NSIS sólido tem posição de bytes coerente com o conteúdo;
-      # o modo mais comum de build quebrado neste projeto produzia ~300 KB.
+      # --- Validação antes de entregar --------------------------------------
+      # Um NSIS sólido aqui tem ~190 MB; o modo de falha clássico deste
+      # projeto (primeira passada sem finalizar) produzia ~300 KB. Erro aqui
+      # impede a publicação de um arquivo quebrado.
       - name: Conferir os artefatos
         shell: pwsh
         run: |
-          $exe = Get-Item "dist-desktop/DanielLive-Setup-*.exe" -ErrorAction Stop
-          if ($exe.Length -lt 100MB) { throw "instalador NSIS suspeito: $($exe.Length) bytes" }
-          "  $($exe.Name): $([math]::Round($exe.Length / 1MB)) MB — dentro do esperado"
+          $alvos = @(
+            @{ Glob = "dist-desktop/DanielLive-Setup-*.exe"; MinMB = 170 ; Nome = "NSIS" },
+            @{ Glob = "dist-desktop/DanielLive-*.msi";       MinMB = 170 ; Nome = "MSI" },
+            @{ Glob = "dist-desktop/DanielLive-Portatil-*.exe"; MinMB = 135 ; Nome = "Portátil" }
+          )
+          foreach ($a in $alvos) {
+            $f = Get-Item $a.Glob -ErrorAction Stop
+            $mb = [math]::Round($f.Length / 1MB)
+            if ($mb -lt $a.MinMB) { throw "$($a.Nome) suspeito: $mb MB (mínimo $($a.MinMB) MB)" }
+            "  $($f.Name): $mb MB — íntegro"
+          }
+
+      # Publica na Release só quando o gatilho foi uma tag (o dispatch manual
+      # fica só como ensaio de build, na seção de artefatos da execução).
+      - name: Publicar na GitHub Release
+        if: startswith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-desktop/*.exe
+            dist-desktop/*.msi
+            dist-desktop/*.blockmap
+          generate_release_notes: true
+
+      # Mesmo no ensaio manual os arquivos ficam anexados à execução por 5
+      # dias — baixa ali e instala sem precisar de tag.
+      - name: Anexar artefatos à execução (ensaio manual)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instaladores-${{ github.ref_name }}
+          path: |
+            dist-desktop/*.exe
+            dist-desktop/*.msi
+            dist-desktop/*.blockmap
+          retention-days: 5
+          if-no-files-found: ignore
