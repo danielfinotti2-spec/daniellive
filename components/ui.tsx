@@ -16,6 +16,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useTexto } from "@/lib/idioma";
+import { AnimatePresence, motion, MOLA_PEQUENA, MOLA_PAINEIS, APERTO, type HTMLMotionProps } from "@/components/animacao";
 
 /* -------------------------------------------------------------- utilidade */
 
@@ -57,19 +58,29 @@ export function Botao({
   children,
   disabled,
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: HTMLMotionProps<"button"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   carregando?: boolean;
+  /**
+   * O tipo do Motion também aceita `MotionValue` como filho — para animar o
+   * próprio rótulo por JavaScript. Aqui o rótulo é sempre texto comum, então
+   * o tipo é estreitado de propósito: chamador autônomo não precisa saber que
+   * a outra forma existe.
+   */
+  children?: React.ReactNode;
   /** Texto que substitui o conteúdo enquanto `carregando` — dizer o que está
    *  sendo esperado ("Abrindo a captura…") é mais útil que um giro mudo. */
   rotuloCarregando?: string;
 }) {
   return (
-    <button
+    <motion.button
       {...rest}
       disabled={disabled || carregando}
       aria-busy={carregando || undefined}
+      // Reação física ao clique: o botão recua levemente, como um botão real.
+      // Disabled sai de cena porque gesto em controle desligado não responde.
+      whileTap={disabled || carregando ? undefined : APERTO}
       className={cx(
         "inline-flex cursor-pointer items-center justify-center rounded-lg font-medium transition-colors",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -80,7 +91,7 @@ export function Botao({
     >
       {carregando && <Spinner className="h-3.5 w-3.5" />}
       {carregando && rotuloCarregando ? rotuloCarregando : children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -396,8 +407,20 @@ export function Aviso({
    * chamadores tem o que dizer aqui — todos querem a mesma palavra.
    */
   const t = useTexto();
+  /*
+   * A raiz é um `motion.div` para chegar entrando (sempre) e sair desvanecendo
+   * quando algum `AnimatePresence` a envolve — o desligar de um aviso era um
+   * corte seco, e saída animada CSS não existe porque o React desmonta na hora.
+   *
+   * Sem nenhum `AnimatePresence` acima, a saída continua instantânea e nada
+   * quebra: a entrada funciona sozinha.
+   */
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={MOLA_PEQUENA}
       role={tom === "erro" ? "alert" : "status"}
       className={cx("flex items-start gap-3 rounded-xl border px-4 py-3 text-sm", caixa, className)}
     >
@@ -410,18 +433,19 @@ export function Aviso({
       </div>
       {acao && <div className="shrink-0">{acao}</div>}
       {aoFechar && (
-        <button
+        <motion.button
           type="button"
           onClick={aoFechar}
+          whileTap={APERTO}
           aria-label={t.comum.dispensarAviso}
           className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-full p-1 leading-none opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
-        </button>
+        </motion.button>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -630,58 +654,79 @@ export function Dialogo({
     };
   }, [aberto, onFechar]);
 
-  if (!montado || !aberto) return null;
+  if (!montado) return null;
 
   const larguras = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg" } as const;
 
+  /*
+   * O conteúdo fica sob `AnimatePresence` mesmo fechado: é o que deixa a saída
+   * ser animada. Antes a condição morava no `return null` acima, e fechar um
+   * diálogo era sempre um corte — abrir tinha animação, fechar não tinha nada.
+   *
+   * As classes CSS de entrada (`dialog-backdrop`, `dialog-card`) saíram de
+   * cena porque agora entrada e saída são da mesma mola Motion, com
+   * `reducedMotion="user"` cuidando do caso de menos animação.
+   */
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <div
-        className="dialog-backdrop absolute inset-0 bg-black/60 backdrop-blur-[2px]"
-        onClick={onFechar}
-        aria-hidden
-      />
-      <div
-        ref={caixaRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={idTitulo}
-        aria-describedby={descricao ? idDescricao : undefined}
-        className={cx(
-          "dialog-card relative w-full rounded-t-2xl border border-zinc-200 bg-white shadow-2xl",
-          "dark:border-zinc-800 dark:bg-zinc-950",
-          "sm:rounded-2xl",
-          larguras[largura],
-        )}
-      >
-        <div className="flex items-start gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
-          <div className="min-w-0 flex-1">
-            <h2
-              id={idTitulo}
-              className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
-            >
-              {titulo}
-            </h2>
-            {descricao && (
-              <p id={idDescricao} className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                {descricao}
-              </p>
+    <AnimatePresence>
+      {aberto && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            onClick={onFechar}
+            aria-hidden
+          />
+          <motion.div
+            ref={caixaRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={idTitulo}
+            aria-describedby={descricao ? idDescricao : undefined}
+            initial={{ opacity: 0, y: 24, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.985 }}
+            transition={MOLA_PAINEIS}
+            className={cx(
+              "relative w-full rounded-t-2xl border border-zinc-200 bg-white shadow-2xl",
+              "dark:border-zinc-800 dark:bg-zinc-950",
+              "sm:rounded-2xl",
+              larguras[largura],
             )}
-          </div>
-          <BotaoIcone rotulo={t.comum.fechar} onClick={onFechar} className="-mr-1 -mt-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </BotaoIcone>
+          >
+            <div className="flex items-start gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id={idTitulo}
+                  className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
+                >
+                  {titulo}
+                </h2>
+                {descricao && (
+                  <p id={idDescricao} className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    {descricao}
+                  </p>
+                )}
+              </div>
+              <BotaoIcone rotulo={t.comum.fechar} onClick={onFechar} className="-mr-1 -mt-1">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </BotaoIcone>
+            </div>
+            {children && <div className="px-5 py-4">{children}</div>}
+            {rodape && (
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 px-5 py-4 dark:border-zinc-800">
+                {rodape}
+              </div>
+            )}
+          </motion.div>
         </div>
-        {children && <div className="px-5 py-4">{children}</div>}
-        {rodape && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 px-5 py-4 dark:border-zinc-800">
-            {rodape}
-          </div>
-        )}
-      </div>
-    </div>,
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }
@@ -848,35 +893,49 @@ export function Menu({
         </Botao>
       )}
 
-      {aberto && (
-        <div
-          ref={itensRef}
-          role="menu"
-          aria-label={rotulo}
-          className={cx(
-            "fade-in absolute z-40 min-w-44 rounded-xl border border-zinc-200 bg-white p-1 shadow-lg",
-            "dark:border-zinc-800 dark:bg-zinc-950",
-            alinhamento === "direita" ? "right-0" : "left-0",
-            /**
-             * O lado é escolhido em tempo de execução, então as duas variantes
-             * usam as mesmas medidas espelhadas. `top-full`/`bottom-full`
-             * ancoram no gatilho, e a margem de 6px é a mesma dos dois lados
-             * para o menu não encostar no botão ao virar.
-             */
-            paraCima ? "bottom-full mb-1.5" : "top-full mt-1.5",
-            /**
-             * Rede de segurança para quando nenhum dos lados cabe — uma janela
-             * muito baixa, por exemplo. Sem isto o menu continua sendo cortado,
-             * só que agora para cima. `dvh` acompanha a janela quando a barra
-             * do navegador aparece e some; `overflow-y-auto` garante que os
-             * itens de baixo continuem alcançáveis por rolagem.
-             */
-            "max-h-[min(70dvh,420px)] overflow-y-auto",
-          )}
-        >
-          {children(() => setAberto(false))}
-        </div>
-      )}
+      {/*
+       * `AnimatePresence` fica montado sempre — é a condição interna que vem e
+       * vai — para o menu poder fechar desvanecendo em vez de sumir num corte.
+       * O deslocamento é direcional: abrindo para cima, vem de baixo, e vice-
+       * versa, como uma folha saindo do próprio gatilho.
+       */}
+      <AnimatePresence>
+        {aberto && (
+          <motion.div
+            key="painel"
+            ref={itensRef}
+            role="menu"
+            aria-label={rotulo}
+            initial={{ opacity: 0, scale: 0.97, y: paraCima ? 6 : -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: paraCima ? 4 : -4 }}
+            transition={MOLA_PEQUENA}
+            style={{ transformOrigin: paraCima ? "bottom" : "top" }}
+            className={cx(
+              "absolute z-40 min-w-44 rounded-xl border border-zinc-200 bg-white p-1 shadow-lg",
+              "dark:border-zinc-800 dark:bg-zinc-950",
+              alinhamento === "direita" ? "right-0" : "left-0",
+              /**
+               * O lado é escolhido em tempo de execução, então as duas variantes
+               * usam as mesmas medidas espelhadas. `top-full`/`bottom-full`
+               * ancoram no gatilho, e a margem de 6px é a mesma dos dois lados
+               * para o menu não encostar no botão ao virar.
+               */
+              paraCima ? "bottom-full mb-1.5" : "top-full mt-1.5",
+              /**
+               * Rede de segurança para quando nenhum dos lados cabe — uma janela
+               * muito baixa, por exemplo. Sem isto o menu continua sendo cortado,
+               * só que agora para cima. `dvh` acompanha a janela quando a barra
+               * do navegador aparece e some; `overflow-y-auto` garante que os
+               * itens de baixo continuem alcançáveis por rolagem.
+               */
+              "max-h-[min(70dvh,420px)] overflow-y-auto",
+            )}
+          >
+            {children(() => setAberto(false))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   HostPeer,
   ScreenCaptureError,
   supportsDisplayCapture,
+  aplicarQualidadeAoVivo,
   type CaptureOptions,
   type LocalCapture,
 } from "./webrtc";
@@ -121,6 +122,21 @@ export function useHost({ name }: { name: string }) {
   const pausadoRef = useRef(false);
 
   const [options, setOptions] = useState<CaptureOptions>({ withAudio: true, quality: "auto" });
+
+  /**
+   * Trocar de qualidade durante a transmissão passa a valer na hora.
+   *
+   * Antes só capturas novas pegavam o degrau: quem mudava a qualidade ao vivo
+   * via a confirmação da escolha, mas nada acontecia na rede — o que dava a
+   * impressão certa de que a opção "não funcionava". O efeito aplica o degrau
+   * à captura e aos transmissores existentes; na próxima captura ele já vem
+   * por `captureScreen` de qualquer forma.
+   */
+  useEffect(() => {
+    const capture = captureRef.current;
+    if (!capture || phase !== "ao-vivo") return;
+    aplicarQualidadeAoVivo(capture, [...peersRef.current.values()], options.quality);
+  }, [options.quality, phase]);
 
   // Guarda o nome mais recente sem reiniciar o efeito de conexão: o nome só é
   // enviado ao servidor na criação da sala.
@@ -335,11 +351,8 @@ export function useHost({ name }: { name: string }) {
           break;
         }
         case "error": {
-          setError(
-            message.code === "limite-de-salas"
-              ? "Você criou muitas transmissões em pouco tempo. Aguarde um minuto."
-              : "O servidor recusou a operação. Tente novamente.",
-          );
+          const erro = dicionario(idiomaRef.current).erro;
+          setError(message.code === "limite-de-salas" ? erro.muitasSalas : erro.operacaoRecusada);
           break;
         }
         default:
@@ -377,6 +390,9 @@ export function useHost({ name }: { name: string }) {
     try {
       const capture = await captureScreen(options);
       captureRef.current = capture;
+      // Texto de tela compartilhada fica nítido com a dica de conteúdo certa:
+      // sem ela, alguns navegadores otimizam para movimento e borram as letras.
+      capture.videoTrack.contentHint = "detail";
       setLocalPreview(capture.stream);
       setHasAudio(capture.hasAudio);
       setPhase("ao-vivo");
@@ -386,7 +402,7 @@ export function useHost({ name }: { name: string }) {
       // tivesse clicado em parar, senão a interface mentiria "ao vivo".
       capture.videoTrack.addEventListener("ended", () => {
         setMotivoParada("navegador");
-        stopSharing("O compartilhamento foi encerrado pelo navegador.");
+        stopSharing(dicionario(idiomaRef.current).erro.paradaPeloNavegador);
       });
 
       clientRef.current?.send({ type: "sharing", on: true });

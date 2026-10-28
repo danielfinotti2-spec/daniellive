@@ -55,6 +55,7 @@ const ptBR = {
     copiar: "Copiar",
     copiado: "Copiado!",
     naoCopiou: "Não foi possível",
+    nadaParaColar: "A área de transferência está vazia.",
     copiarLink: "Copiar link",
     copiarCodigo: "Copiar código",
     fechar: "Fechar",
@@ -175,6 +176,10 @@ const ptBR = {
     dica: "Cole o link que você recebeu ou digite o código da sala.",
     placeholder: "Cole o link ou o código da sala",
     codigoInvalido: "Código inválido. Ele tem 9 caracteres, como K7M2PQR4T.",
+    indoNaSala: "Abrindo a sala…",
+    colar: "Colar",
+    colado: "Colado!",
+    verifiqueOTexto: "Verifique o texto e tente de novo.",
     avisoInseguroTitulo: "Esta página não está em HTTPS",
     /**
      * As duas partes entre chaves são literais técnicos (`https://` e
@@ -399,7 +404,7 @@ const ptBR = {
     dicaPausar: "Pausar interrompe o envio de verdade, sem gastar banda.",
     botaoEncerrar: "Encerrar",
     botaoPararDeCompartilhar: "Parar de compartilhar",
-    escolhasValemProxima: "Estas escolhas valem para a próxima vez que você compartilhar a tela.",
+    escolhasValemProxima: "Aplicadas na hora e lembradas na próxima transmissão.",
     incluirAudioAba: "Incluir o áudio da aba",
     audioSoEmAbaApache:
       "Só funciona ao compartilhar uma aba do navegador. Para uma tela inteira, o áudio do sistema não é capturado.",
@@ -512,6 +517,9 @@ const ptBR = {
     capturaNaoIniciada: "Não foi possível iniciar a captura.",
     naoRespondeuAoAnfitriao: "Não foi possível responder ao anfitrião.",
     servidorReiniciando: "O servidor está reiniciando. Recarregue a página em instantes.",
+    muitasSalas: "Você criou muitas transmissões em pouco tempo. Aguarde um minuto.",
+    operacaoRecusada: "O servidor recusou a operação. Tente novamente.",
+    paradaPeloNavegador: "O compartilhamento foi encerrado pelo navegador.",
   },
   rodape: {
     criar: "Criar transmissão",
@@ -560,6 +568,7 @@ const en: Dicionario = {
     copiar: "Copy",
     copiado: "Copied!",
     naoCopiou: "Could not copy",
+    nadaParaColar: "The clipboard is empty.",
     copiarLink: "Copy link",
     copiarCodigo: "Copy code",
     fechar: "Close",
@@ -673,6 +682,10 @@ const en: Dicionario = {
     dica: "Paste the link you received or type the room code.",
     placeholder: "Paste the link or the room code",
     codigoInvalido: "Invalid code. It has 9 characters, like K7M2PQR4T.",
+    indoNaSala: "Opening the room…",
+    colar: "Paste",
+    colado: "Pasted!",
+    verifiqueOTexto: "Check the text and try again.",
     avisoInseguroTitulo: "This page is not on HTTPS",
     avisoInseguroTexto:
       "Browsers only allow screen sharing on secure connections. Capture will fail here. Open the site over {https} or on {localhost}.",
@@ -862,7 +875,7 @@ const en: Dicionario = {
     dicaPausar: "Pausing really stops sending, without spending bandwidth.",
     botaoEncerrar: "End",
     botaoPararDeCompartilhar: "Stop sharing",
-    escolhasValemProxima: "These choices apply the next time you share your screen.",
+    escolhasValemProxima: "Applied right away and remembered for the next stream.",
     incluirAudioAba: "Include tab audio",
     audioSoEmAbaApache:
       "Only works when sharing a browser tab. For a whole screen, system audio is not captured.",
@@ -959,6 +972,9 @@ const en: Dicionario = {
     capturaNaoIniciada: "Could not start the capture.",
     naoRespondeuAoAnfitriao: "Could not answer the host.",
     servidorReiniciando: "The server is restarting. Reload the page in a moment.",
+    muitasSalas: "You created too many streams in a short time. Wait a minute.",
+    operacaoRecusada: "The server refused the operation. Try again.",
+    paradaPeloNavegador: "Sharing was stopped by the browser.",
   },
   rodape: {
     criar: "Start streaming",
@@ -981,6 +997,7 @@ const es: Dicionario = {
     copiar: "Copiar",
     copiado: "¡Copiado!",
     naoCopiou: "No se pudo copiar",
+    nadaParaColar: "El portapapeles está vacío.",
     copiarLink: "Copiar enlace",
     copiarCodigo: "Copiar código",
     fechar: "Cerrar",
@@ -1094,6 +1111,10 @@ const es: Dicionario = {
     dica: "Pega el enlace que recibiste o escribe el código de la sala.",
     placeholder: "Pega el enlace o el código de la sala",
     codigoInvalido: "Código inválido. Tiene 9 caracteres, como K7M2PQR4T.",
+    indoNaSala: "Abriendo la sala…",
+    colar: "Pegar",
+    colado: "¡Pegado!",
+    verifiqueOTexto: "Revisa el texto e inténtalo de nuevo.",
     avisoInseguroTitulo: "Esta página no está en HTTPS",
     avisoInseguroTexto:
       "Los navegadores solo permiten compartir la pantalla en conexiones seguras. Aquí la captura va a fallar. Abre el sitio por {https} o por {localhost}.",
@@ -1283,7 +1304,7 @@ const es: Dicionario = {
     dicaPausar: "Pausar detiene el envío de verdad, sin gastar ancho de banda.",
     botaoEncerrar: "Terminar",
     botaoPararDeCompartilhar: "Dejar de compartir",
-    escolhasValemProxima: "Estas opciones valen la próxima vez que compartas la pantalla.",
+    escolhasValemProxima: "Se aplican al instante y se recuerdan en la próxima transmisión.",
     incluirAudioAba: "Incluir el audio de la pestaña",
     audioSoEmAbaApache:
       "Solo funciona al compartir una pestaña del navegador. Para una pantalla completa, el audio del sistema no se captura.",
@@ -1380,6 +1401,9 @@ const es: Dicionario = {
     capturaNaoIniciada: "No se pudo iniciar la captura.",
     naoRespondeuAoAnfitriao: "No se pudo responder al anfitrión.",
     servidorReiniciando: "El servidor se está reiniciando. Recarga la página en un momento.",
+    muitasSalas: "Creaste demasiadas transmisiones en poco tiempo. Espera un minuto.",
+    operacaoRecusada: "El servidor rechazó la operación. Inténtalo de nuevo.",
+    paradaPeloNavegador: "El navegador terminó el uso compartido.",
   },
   rodape: {
     criar: "Crear transmisión",

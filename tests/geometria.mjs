@@ -164,36 +164,49 @@ try {
   if (itensMenu.length) {
     // Abre o diálogo pelo item "Mais detalhes…".
     await page.getByRole("menuitem", { name: /mais detalhes/i }).click();
-    await page.waitForTimeout(400);
+    // A animação é medida cedo, ainda no meio dela: é `Motion` (Web Animations
+    // API), então `getAnimations()` no elemento — e não `animationName` do CSS.
+    await page.waitForTimeout(150);
 
-    const dialogo = await page.evaluate(() => {
+    const animacao = await page.evaluate(() => {
       const el = document.querySelector('[role="dialog"]');
       if (!el) return null;
-      const r = el.getBoundingClientRect();
-      const s = getComputedStyle(el);
       return {
-        w: Math.round(r.width),
-        h: Math.round(r.height),
+        emMovimento: el.getAnimations({ subtree: true }).length > 0,
         ariaModal: el.getAttribute("aria-modal"),
         rotulado: Boolean(el.getAttribute("aria-labelledby")),
-        animacao: s.animationName,
-        corpo: document.body.style.overflow,
       };
     });
-    if (dialogo) {
-      conferir("o diálogo aparece com papel e aria-modal", dialogo.ariaModal === "true", `aria-modal=${dialogo.ariaModal}`);
-      conferir("o diálogo é rotulado por um título", dialogo.rotulado, `aria-labelledby=${dialogo.rotulado}`);
-      conferir("o diálogo anima na entrada", dialogo.animacao !== "none", dialogo.animacao);
-      // O corpo precisa travar: rolar o fundo com um modal aberto é desorientador.
-      conferir("o fundo não rola com o diálogo aberto", dialogo.corpo === "hidden", `overflow=${dialogo.corpo || "visível"}`);
-      conferir("o diálogo cabe na janela", dialogo.h <= 950, `${dialogo.w}x${dialogo.h}`);
+    if (animacao) {
+      conferir("o diálogo aparece com papel e aria-modal", animacao.ariaModal === "true", `aria-modal=${animacao.ariaModal}`);
+      conferir("o diálogo é rotulado por um título", animacao.rotulado, `aria-labelledby=${animacao.rotulado}`);
+      conferir("o diálogo anima na entrada", animacao.emMovimento, animacao.emMovimento ? "animação WAAPI ativa" : "parado demais");
     } else {
       conferir("o diálogo abre", false, "não encontrado");
     }
 
-    // Esc fecha e o foco volta para onde estava.
+    // Com a animação encerrada, mede tamanho e o travamento do fundo.
+    await page.waitForTimeout(350);
+    const dialogo = await page.evaluate(() => {
+      const el = document.querySelector('[role="dialog"]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        corpo: document.body.style.overflow,
+      };
+    });
+    if (dialogo) {
+      // O corpo precisa travar: rolar o fundo com um modal aberto é desorientador.
+      conferir("o fundo não rola com o diálogo aberto", dialogo.corpo === "hidden", `overflow=${dialogo.corpo || "visível"}`);
+      conferir("o diálogo cabe na janela", dialogo.h <= 950, `${dialogo.w}x${dialogo.h}`);
+    }
+
+    // Esc fecha e o foco volta para onde estava. A saída também é animada, e a
+    // desmontagem só acontece quando ela termina — por isso a espera maior.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(800);
     const fechou = await page.evaluate(() => !document.querySelector('[role="dialog"]'));
     conferir("Esc fecha o diálogo", fechou, fechou ? "fechado" : "continua aberto");
   }

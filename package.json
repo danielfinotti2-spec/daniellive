@@ -16,7 +16,7 @@
     "start:signal": "node server/index.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node --experimental-transform-types --test tests/*.test.mjs",
     "test:signaling": "node --test tests/signaling.e2e.mjs",
     "test:browser": "node tests/browser.e2e.mjs",
     "test:scenarios": "node tests/scenarios.e2e.mjs",
@@ -30,6 +30,7 @@
     "dist": "electron-builder --config electron-builder.config.cjs --win"
   },
   "dependencies": {
+    "motion": "^14.7.1",
     "next": "^16.4.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",

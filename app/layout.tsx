@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { TabBar } from "@/components/TabBar";
 import { ThemeScript } from "@/components/ThemeScript";
 import { PularParaConteudo } from "@/components/PularParaConteudo";
+import { MotionRoot } from "@/components/animacao";
 
 // A mesma família da referência, servida pelo próprio domínio: sem requisição
 // a terceiros e sem deslocamento de layout, porque o Next gera o @font-face e
@@ -57,13 +58,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeScript />
       </head>
       <body className="flex min-h-dvh flex-col bg-zinc-50 text-foreground dark:bg-black">
-        <PularParaConteudo />
-        <SiteHeader />
-        <main id="conteudo" className="flex flex-1 flex-col">
-          {children}
-        </main>
-        <SiteFooter />
-        <TabBar />
+        <MotionRoot>
+          <PularParaConteudo />
+          <SiteHeader />
+          <main id="conteudo" className="flex flex-1 flex-col">
+            {children}
+          </main>
+          <SiteFooter />
+          <TabBar />
+        </MotionRoot>
       </body>
     </html>
   );

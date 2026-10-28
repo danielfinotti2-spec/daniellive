@@ -13,6 +13,7 @@
  */
 
 import { iceConfig, hasTurn } from "./ice";
+import { QUALITY_CONSTRAINTS, type CaptureQuality } from "./qualidade";
 import type { SignalPayload } from "./protocol";
 import type { Dicionario } from "./idioma";
 
@@ -20,8 +21,13 @@ export type CaptureOptions = {
   /** Áudio da aba/sistema quando o navegador oferecer. */
   withAudio: boolean;
   /** Qualidade alvo da captura. */
-  quality: "auto" | "1080p" | "720p" | "480p";
+  quality: CaptureQuality;
 };
+
+// A aplicação ao vivo da qualidade vive em `qualidade.ts`; a reexportação
+// mantém a porta de entrada única para quem já importa daqui.
+export { aplicarQualidadeAoVivo } from "./qualidade";
+export type { CaptureQuality } from "./qualidade";
 
 export type LocalCapture = {
   stream: MediaStream;
@@ -29,13 +35,6 @@ export type LocalCapture = {
   audioTrack: MediaStreamTrack | null;
   hasAudio: boolean;
   label: string;
-};
-
-const QUALITY_CONSTRAINTS: Record<CaptureOptions["quality"], MediaTrackConstraints> = {
-  auto: {},
-  "1080p": { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
-  "720p": { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-  "480p": { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
 };
 
 export class ScreenCaptureError extends Error {

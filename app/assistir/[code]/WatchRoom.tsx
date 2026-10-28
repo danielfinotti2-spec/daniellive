@@ -16,6 +16,7 @@ import {
   cx,
 } from "@/components/ui";
 import { useViewer } from "@/lib/useViewer";
+import { AnimatePresence, ListaViva, ItemVivo } from "@/components/animacao";
 import { preencher, useTexto, type Dicionario } from "@/lib/idioma";
 
 /**
@@ -153,39 +154,50 @@ export function WatchRoom({ code }: { code: string }) {
           </Cartao>
 
           {/* Falhas: cada estado diz o que fazer, não só o que houve. */}
-          {viewer.phase === "inexistente" && (
-            <Aviso tom="erro" titulo={t.assistir.naoExisteTitulo}>
-              {t.assistir.naoExisteTexto}
-            </Aviso>
-          )}
-          {viewer.phase === "cheia" && (
-            <Aviso tom="aviso" titulo={t.assistir.cheiaTitulo}>
-              {t.assistir.cheiaTexto}
-            </Aviso>
-          )}
-          {viewer.phase === "encerrada" && (
-            <Aviso tom="info" titulo={t.assistir.encerradaTitulo}>
-              {t.assistir.encerradaTexto}
-            </Aviso>
-          )}
-          {viewer.phase === "erro" && (
-            <Aviso
-              tom="erro"
-              titulo={t.assistir.erroTitulo}
-              acao={
-                <Botao variant="secundario" size="sm" onClick={viewer.retry}>
-                  {t.assistir.tentarDeNovo}
-                </Botao>
-              }
-            >
-              {viewer.error ?? t.assistir.erroTexto}
-            </Aviso>
-          )}
-          {viewer.connectionState === "disconnected" && recebendo && (
-            <Aviso tom="aviso" titulo={t.assistir.caiuTitulo}>
-              {t.assistir.caiuTexto}
-            </Aviso>
-          )}
+          <AnimatePresence>
+            {viewer.phase === "inexistente" && (
+              <Aviso key="naoexiste" tom="erro" titulo={t.assistir.naoExisteTitulo}>
+                {t.assistir.naoExisteTexto}
+              </Aviso>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {viewer.phase === "cheia" && (
+              <Aviso key="cheia" tom="aviso" titulo={t.assistir.cheiaTitulo}>
+                {t.assistir.cheiaTexto}
+              </Aviso>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {viewer.phase === "encerrada" && (
+              <Aviso key="encerrada" tom="info" titulo={t.assistir.encerradaTitulo}>
+                {t.assistir.encerradaTexto}
+              </Aviso>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {viewer.phase === "erro" && (
+              <Aviso
+                key="erro"
+                tom="erro"
+                titulo={t.assistir.erroTitulo}
+                acao={
+                  <Botao variant="secundario" size="sm" onClick={viewer.retry}>
+                    {t.assistir.tentarDeNovo}
+                  </Botao>
+                }
+              >
+                {viewer.error ?? t.assistir.erroTexto}
+              </Aviso>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {viewer.connectionState === "disconnected" && recebendo && (
+              <Aviso key="caiu" tom="aviso" titulo={t.assistir.caiuTitulo}>
+                {t.assistir.caiuTexto}
+              </Aviso>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Coluna lateral */}
@@ -212,13 +224,14 @@ export function WatchRoom({ code }: { code: string }) {
             {viewer.participants.length === 0 ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.assistir.ninguemNaSala}</p>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <ListaViva className="flex flex-col gap-1">
                 {viewer.participants.map((p) => {
                   const transmite = Boolean(p.isSharing);
                   return (
-                    <li
+                    <ItemVivo
                       key={p.id}
-                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                      chave={p.id}
+                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <span
@@ -234,14 +247,13 @@ export function WatchRoom({ code }: { code: string }) {
                         </span>
                         <span className="truncate text-sm text-zinc-800 dark:text-zinc-200">
                           {p.name || "Sem nome"}
-                          {p.id === viewer.participants[0]?.id && !transmite ? "" : ""}
                         </span>
                       </span>
                       {transmite && <Selo tom="ao-vivo">{t.assistir.apresentando}</Selo>}
-                    </li>
+                    </ItemVivo>
                   );
                 })}
-              </ul>
+              </ListaViva>
             )}
           </CartaoSecao>
 

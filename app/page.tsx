@@ -5,6 +5,7 @@ import { CartaoCriarTransmissao, FormularioEntrar } from "@/components/HomeActio
 import { Cartao } from "@/components/ui";
 import { RedesSociais } from "@/components/RedesSociais";
 import { TextoAmbiente, TrechoAmbiente, ItemRecurso } from "@/components/TextoAmbiente";
+import { AoEntrarNaTela, Aparecer } from "@/components/animacao";
 import { useTexto } from "@/lib/idioma";
 
 export default function Home() {
@@ -16,22 +17,30 @@ export default function Home() {
       <section className="flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-start gap-10 px-4 pb-12 pt-10 lg:justify-center lg:py-16">
         <div className="flex w-full max-w-6xl flex-col items-center gap-10 lg:flex-row lg:items-start lg:justify-center lg:gap-12">
           <div className="w-full max-w-xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
-              {/* No site, "sem instalar nada" é o argumento. No aplicativo, quem
-                  lê já instalou — o argumento passa a ser não precisar de conta. */}
-              <TextoAmbiente web={t.home.seloWeb} app={t.home.seloApp} />
-            </span>
+            {/* A dobra entra em sequência: selo, título, texto, recursos —
+                cada um anunciando o próximo, em vez de tudo piscando junto. */}
+            <Aparecer>
+              <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
+                {/* No site, "sem instalar nada" é o argumento. No aplicativo, quem
+                    lê já instalou — o argumento passa a ser não precisar de conta. */}
+                <TextoAmbiente web={t.home.seloWeb} app={t.home.seloApp} />
+              </span>
+            </Aparecer>
 
-            <h1 className="mt-5 text-3xl font-bold leading-[1.15] tracking-tight text-zinc-950 sm:text-4xl lg:text-5xl dark:text-zinc-50">
-              {t.home.titulo}
-              <br />
-              <span className="text-broadcast">{t.home.tituloDestaque}</span>
-            </h1>
+            <Aparecer atraso={0.06}>
+              <h1 className="mt-5 text-3xl font-bold leading-[1.15] tracking-tight text-zinc-950 sm:text-4xl lg:text-5xl dark:text-zinc-50">
+                {t.home.titulo}
+                <br />
+                <span className="text-broadcast">{t.home.tituloDestaque}</span>
+              </h1>
+            </Aparecer>
 
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
-              <TrechoAmbiente web={t.home.subtituloWeb} app={t.home.subtituloApp} />
-            </p>
+            <Aparecer atraso={0.12}>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
+                <TrechoAmbiente web={t.home.subtituloWeb} app={t.home.subtituloApp} />
+              </p>
+            </Aparecer>
 
             {/*
               Aqui havia o mascote acompanhado da descrição do produto. Os dois
@@ -40,16 +49,19 @@ export default function Home() {
               acrescentar nada. A lista de recursos começa logo abaixo do título.
             */}
 
-            <ul className="mt-7 grid gap-2.5 sm:grid-cols-2">
-              <ItemRecurso web={t.home.recursoNavegadoresWeb} app={t.home.recursoNavegadoresApp} />
-              <ItemRecurso web={t.home.recursoCelularWeb} app={t.home.recursoCelularApp} />
-              <ItemRecurso web={t.home.recursoAudioWeb} app={t.home.recursoAudioApp} />
-              <ItemRecurso web={t.home.recursoGravacaoWeb} app={t.home.recursoGravacaoApp} />
-            </ul>
+            <Aparecer atraso={0.18}>
+              <ul className="mt-7 grid gap-2.5 sm:grid-cols-2">
+                <ItemRecurso web={t.home.recursoNavegadoresWeb} app={t.home.recursoNavegadoresApp} />
+                <ItemRecurso web={t.home.recursoCelularWeb} app={t.home.recursoCelularApp} />
+                <ItemRecurso web={t.home.recursoAudioWeb} app={t.home.recursoAudioApp} />
+                <ItemRecurso web={t.home.recursoGravacaoWeb} app={t.home.recursoGravacaoApp} />
+              </ul>
+            </Aparecer>
           </div>
 
           {/* O cartão de ação fica sozinho numa coluna: é o que a pessoa veio
               fazer, e dividir espaço com o texto o colocaria em segundo lugar. */}
+          <Aparecer atraso={0.24} className="w-full max-w-md">
           <Cartao className="w-full max-w-md p-5 sm:p-7" id="entrar">
             <h2 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
               {t.home.comecarAgora}
@@ -70,6 +82,7 @@ export default function Home() {
 
             <FormularioEntrar compacto />
           </Cartao>
+          </Aparecer>
         </div>
       </section>
 
@@ -107,20 +120,27 @@ export default function Home() {
               },
             ].map((passo, i) => (
               <li key={passo.titulo}>
-                <Cartao className="h-full p-5">
-                  <span
-                    aria-hidden
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-broadcast text-xs font-bold text-white"
-                  >
-                    {i + 1}
-                  </span>
-                  <h3 className="mt-3 text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                    {passo.titulo}
-                  </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    <TextoAmbiente web={passo.texto} app={passo.textoApp} />
-                  </p>
-                </Cartao>
+                {/*
+                 * Cada passo entra um pouco depois do anterior quando a rolagem
+                 * os traz — leitura da esquerda para a direita, como a ordem em
+                 * que a pessoa seguiria.
+                 */}
+                <AoEntrarNaTela atraso={i * 0.07} className="h-full">
+                  <Cartao className="h-full p-5">
+                    <span
+                      aria-hidden
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-broadcast text-xs font-bold text-white"
+                    >
+                      {i + 1}
+                    </span>
+                    <h3 className="mt-3 text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                      {passo.titulo}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                      <TextoAmbiente web={passo.texto} app={passo.textoApp} />
+                    </p>
+                  </Cartao>
+                </AoEntrarNaTela>
               </li>
             ))}
           </ol>
@@ -139,38 +159,44 @@ export default function Home() {
       {/* Privacidade: a pergunta que sempre vem antes de compartilhar a tela. */}
       <section className="border-t border-black/5 bg-zinc-50 px-4 py-16 dark:border-white/5 dark:bg-black">
         <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-3">
-          <Cartao className="p-5">
-            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              {t.home.privacidade.titulo1}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-              <TrechoAmbiente
-                web={t.home.privacidade.texto1Web}
-                app={t.home.privacidade.texto1App}
-              />
-            </p>
-          </Cartao>
+          <AoEntrarNaTela atraso={0}>
+            <Cartao className="h-full p-5">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                {t.home.privacidade.titulo1}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                <TrechoAmbiente
+                  web={t.home.privacidade.texto1Web}
+                  app={t.home.privacidade.texto1App}
+                />
+              </p>
+            </Cartao>
+          </AoEntrarNaTela>
 
-          <Cartao className="p-5">
-            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              {t.home.privacidade.titulo2}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-              <TrechoAmbiente
-                web={t.home.privacidade.texto2Web}
-                app={t.home.privacidade.texto2App}
-              />
-            </p>
-          </Cartao>
+          <AoEntrarNaTela atraso={0.07}>
+            <Cartao className="h-full p-5">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                {t.home.privacidade.titulo2}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                <TrechoAmbiente
+                  web={t.home.privacidade.texto2Web}
+                  app={t.home.privacidade.texto2App}
+                />
+              </p>
+            </Cartao>
+          </AoEntrarNaTela>
 
-          <Cartao className="p-5">
-            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              {t.home.privacidade.titulo3}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-              {t.home.privacidade.texto3}
-            </p>
-          </Cartao>
+          <AoEntrarNaTela atraso={0.14}>
+            <Cartao className="h-full p-5">
+              <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+                {t.home.privacidade.titulo3}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                {t.home.privacidade.texto3}
+              </p>
+            </Cartao>
+          </AoEntrarNaTela>
         </div>
       </section>
 

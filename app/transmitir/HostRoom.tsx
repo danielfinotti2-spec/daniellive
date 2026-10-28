@@ -26,6 +26,7 @@ import {
 import { useHost } from "@/lib/useHost";
 import { useAplicativo } from "@/lib/desktop";
 import { VoltarAoInicio } from "@/components/VoltarAoInicio";
+import { AnimatePresence, ListaViva, ItemVivo } from "@/components/animacao";
 import { preencher, useTexto } from "@/lib/idioma";
 import type { CaptureOptions } from "@/lib/webrtc";
 
@@ -101,20 +102,23 @@ export function HostRoom() {
         </Link>
       </div>
 
-      {host.error && (
-        <div className="mt-4">
-          <Aviso tom="erro" titulo={t.transmitir.erroTitulo} aoFechar={host.dismissError}>
+      {/*
+       * Erros e avisos saem desvanecendo (AnimatePresence montado sempre, a
+       * condição dentro dele). Dois `AnimatePresence` separados porque as duas
+       * mensagens são independentes — uma pode dispensar a outra.
+       */}
+      <div className="mt-4 flex flex-col gap-3">
+        <AnimatePresence>{host.error && (
+          <Aviso key="erro" tom="erro" titulo={t.transmitir.erroTitulo} aoFechar={host.dismissError}>
             {host.error}
           </Aviso>
-        </div>
-      )}
-      {host.notice && (
-        <div className="mt-4">
-          <Aviso tom="info" aoFechar={host.dismissNotice}>
+        )}</AnimatePresence>
+        <AnimatePresence>{host.notice && (
+          <Aviso key="aviso" tom="info" aoFechar={host.dismissNotice}>
             {host.notice}
           </Aviso>
-        </div>
-      )}
+        )}</AnimatePresence>
+      </div>
       {!podeCapturar && (
         <div className="mt-4">
           <Aviso tom="erro" titulo={t.transmitir.semCapturaTitulo}>
@@ -362,11 +366,17 @@ export function HostRoom() {
                 </p>
               </div>
             ) : (
-              <ul className="flex flex-col gap-1">
+              /*
+               * Lista viva: quem entra sobe no lugar, quem sai desvanece e os
+               * outros deslizam para preencher o espaço — uma lista que pisca
+               * para reorganizar parece bug, esta lê como fato acontecendo.
+               */
+              <ListaViva className="flex flex-col gap-1">
                 {host.viewers.map((v) => (
-                  <li
+                  <ItemVivo
                     key={v.id}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    chave={v.id}
+                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <span
@@ -380,9 +390,9 @@ export function HostRoom() {
                       </span>
                     </span>
                     <SeloEspectador estado={host.viewerStates[v.id] ?? "novo"} />
-                  </li>
+                  </ItemVivo>
                 ))}
-              </ul>
+              </ListaViva>
             )}
           </CartaoSecao>
 
