@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Blocos de interface do ScreenLive.
+ * Blocos de interface do DanielLive.
  *
  * Tudo aqui é escrito à mão sobre utilitários Tailwind, sem biblioteca de
  * componentes — a mesma escolha de arquitetura da referência, e o que mantém
@@ -13,8 +13,9 @@
  * corretas sem nenhum `dark:` extra.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useTexto } from "@/lib/idioma";
 
 /* -------------------------------------------------------------- utilidade */
 
@@ -389,6 +390,12 @@ export function Aviso({
   aoFechar?: () => void;
 }) {
   const { caixa, icone } = TOM_AVISO[tom];
+  /*
+   * O rótulo do botão de dispensar vem do dicionário, e não de uma prop: ele é
+   * infraestrutura do próprio aviso, não conteúdo de quem o usa. Nenhum dos
+   * chamadores tem o que dizer aqui — todos querem a mesma palavra.
+   */
+  const t = useTexto();
   return (
     <div
       role={tom === "erro" ? "alert" : "status"}
@@ -406,7 +413,7 @@ export function Aviso({
         <button
           type="button"
           onClick={aoFechar}
-          aria-label="Dispensar aviso"
+          aria-label={t.comum.dispensarAviso}
           className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-full p-1 leading-none opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
@@ -565,14 +572,19 @@ export function Dialogo({
 }) {
   const idTitulo = useId();
   const idDescricao = useId();
+  // O rótulo de fechar é do diálogo, não de quem o abre — mesma razão do aviso.
+  const t = useTexto();
   const caixaRef = useRef<HTMLDivElement>(null);
   const anteriorRef = useRef<HTMLElement | null>(null);
-  // O portal só existe no cliente; sem esta guarda o SSR quebraria.
-  const [montado, setMontado] = useState(false);
-
-  useEffect(() => {
-    setMontado(true);
-  }, []);
+  // O portal só existe no cliente; no servidor não há `document.body` para
+  // receber o nó. `useSyncExternalStore` responde "servidor: não; cliente: sim"
+  // sem precisar de um efeito que chame setState — o que provocaria uma
+  // segunda renderização só para descobrir em que lado estamos.
+  const montado = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     if (!aberto) return;
@@ -656,7 +668,7 @@ export function Dialogo({
               </p>
             )}
           </div>
-          <BotaoIcone rotulo="Fechar" onClick={onFechar} className="-mr-1 -mt-1">
+          <BotaoIcone rotulo={t.comum.fechar} onClick={onFechar} className="-mr-1 -mt-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
@@ -708,6 +720,46 @@ export function Menu({
   const [aberto, setAberto] = useState(false);
   const raizRef = useRef<HTMLDivElement>(null);
   const itensRef = useRef<HTMLDivElement>(null);
+  /**
+   * Para que lado o menu abre.
+   *
+   * O menu já abriu sempre para baixo, e isso o deixava inalcançável quando o
+   * gatilho ficava perto do fim da janela: medido no aplicativo, o menu de
+   * qualidade começava em y=571 com 314px de altura numa janela de 821 — os
+   * últimos itens caíam 64px abaixo da borda, sem rolagem que os alcançasse.
+   *
+   * A decisão é tomada **no clique**, não num efeito: ali o DOM do gatilho já
+   * tem posição, e o menu ainda não foi montado. Decidir num efeito depois de
+   * montar exigiria `setState` durante o efeito — o menu apareceria de um lado
+   * e pularia para o outro no quadro seguinte, que é justamente o "fica
+   * bugado" que se quer eliminar.
+   */
+  const [paraCima, setParaCima] = useState(false);
+
+  /** Mede o espaço e decide o lado, antes de o menu existir. */
+  function decidirLado() {
+    const r = raizRef.current?.getBoundingClientRect();
+    if (!r) return;
+    /*
+     * A altura vem de uma constante, e não de uma estimativa por item.
+     *
+     * A primeira versão calculava `itens * 36 + 24` — e errou feio: o menu de
+     * qualidade tem 6 itens, dois separadores e textos que quebram em duas
+     * linhas, então mede 314px, não os 240px que a conta dava. Com a folga de
+     * 8px, o resultado era 248 < 256 (espaço abaixo em y=565 numa janela de
+     * 821), e o menu não virava — continuava 64px para fora, exatamente como
+     * antes da correção.
+     *
+     * O número 380 é maior que o menu mais alto que existe hoje (314px) e
+     * continua menor que a maioria das janelas. Quando ele não bastar, o
+     * `max-h` com rolagem do próprio menu segura o caso.
+     */
+    const alturaTipica = 380;
+    const espacoAbaixo = window.innerHeight - r.bottom;
+    // Vira só quando falta espaço embaixo E há mais espaço em cima: virar com
+    // os dois lados apertados só troca o corte de lugar.
+    setParaCima(espacoAbaixo < alturaTipica && r.top > espacoAbaixo);
+  }
 
   useEffect(() => {
     if (!aberto) return;
@@ -753,10 +805,14 @@ export function Menu({
           aria-haspopup="menu"
           aria-expanded={aberto}
           aria-label={rotulo}
-          onClick={() => setAberto((v) => !v)}
+          onClick={() => {
+            decidirLado();
+            setAberto((v) => !v);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
+              decidirLado();
               setAberto((v) => !v);
             }
           }}
@@ -770,7 +826,10 @@ export function Menu({
           size="sm"
           aria-haspopup="menu"
           aria-expanded={aberto}
-          onClick={() => setAberto((v) => !v)}
+          onClick={() => {
+            decidirLado();
+            setAberto((v) => !v);
+          }}
         >
           {icone}
           <span>{rotulo}</span>
@@ -795,9 +854,24 @@ export function Menu({
           role="menu"
           aria-label={rotulo}
           className={cx(
-            "fade-in absolute z-40 mt-1.5 min-w-44 rounded-xl border border-zinc-200 bg-white p-1 shadow-lg",
+            "fade-in absolute z-40 min-w-44 rounded-xl border border-zinc-200 bg-white p-1 shadow-lg",
             "dark:border-zinc-800 dark:bg-zinc-950",
             alinhamento === "direita" ? "right-0" : "left-0",
+            /**
+             * O lado é escolhido em tempo de execução, então as duas variantes
+             * usam as mesmas medidas espelhadas. `top-full`/`bottom-full`
+             * ancoram no gatilho, e a margem de 6px é a mesma dos dois lados
+             * para o menu não encostar no botão ao virar.
+             */
+            paraCima ? "bottom-full mb-1.5" : "top-full mt-1.5",
+            /**
+             * Rede de segurança para quando nenhum dos lados cabe — uma janela
+             * muito baixa, por exemplo. Sem isto o menu continua sendo cortado,
+             * só que agora para cima. `dvh` acompanha a janela quando a barra
+             * do navegador aparece e some; `overflow-y-auto` garante que os
+             * itens de baixo continuem alcançáveis por rolagem.
+             */
+            "max-h-[min(70dvh,420px)] overflow-y-auto",
           )}
         >
           {children(() => setAberto(false))}
@@ -951,6 +1025,140 @@ export function IconeInfo({ className = "h-4 w-4" }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 16v-4M12 8h.01" />
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ redes ---
+ *
+ * Os ícones das redes sociais são desenhados aqui, à mão, como todos os outros
+ * do projeto: sem biblioteca de ícones, sem requisição externa. Isso mantém o
+ * peso da página previsível e evita que um pacote de terceiros decida o visual
+ * da marca.
+ *
+ * Todos usam `fill="currentColor"` para herdarem a cor do texto e funcionarem
+ * nos dois temas sem regra extra.
+ */
+
+/** Ícone do GitHub. */
+export function IconeGitHub({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.57 2.34 1.12 2.91.85.09-.66.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 2.5-.34c.85 0 1.71.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.59.69.49A10.03 10.03 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
+    </svg>
+  );
+}
+
+/** Ícone do Instagram. */
+export function IconeInstagram({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M17.5 6.5h.01" />
+    </svg>
+  );
+}
+
+/** Ícone do LinkedIn. */
+export function IconeLinkedIn({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9h4v12H3V9Zm7 0h3.8v1.64h.05a4.2 4.2 0 0 1 3.77-2.07c4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.4c0-1.29-.02-2.95-1.8-2.95-1.8 0-2.08 1.4-2.08 2.85V21h-4V9Z" />
+    </svg>
+  );
+}
+
+/** Ícone do Discord. */
+export function IconeDiscord({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M19.27 5.33A16.6 16.6 0 0 0 15.1 4.1a.06.06 0 0 0-.07.03c-.18.32-.38.74-.52 1.07a15.3 15.3 0 0 0-4.6 0c-.14-.34-.35-.75-.53-1.07a.06.06 0 0 0-.07-.03c-1.44.25-2.83.68-4.17 1.23a.06.06 0 0 0-.03.02C2.2 9.05 1.6 12.65 1.9 16.2a.07.07 0 0 0 .03.05 16.7 16.7 0 0 0 5.03 2.5.07.07 0 0 0 .07-.02c.39-.52.73-1.07 1.03-1.65a.06.06 0 0 0-.04-.09c-.55-.2-1.07-.46-1.58-.75a.06.06 0 0 1 0-.11l.31-.24a.06.06 0 0 1 .07 0c3.3 1.48 6.88 1.48 10.14 0a.06.06 0 0 1 .07 0l.32.24a.06.06 0 0 1 0 .11c-.5.29-1.03.54-1.58.75a.06.06 0 0 0-.04.09c.3.58.65 1.13 1.03 1.65a.07.07 0 0 0 .07.02 16.6 16.6 0 0 0 5.04-2.5.07.07 0 0 0 .03-.05c.36-4.1-.6-7.67-2.51-10.85a.05.05 0 0 0-.02-.02ZM8.46 14.04c-.99 0-1.8-.9-1.8-2s.79-2 1.8-2 1.82.91 1.8 2c0 1.1-.8 2-1.8 2Zm7.1 0c-.99 0-1.8-.9-1.8-2s.79-2 1.8-2 1.82.91 1.8 2c0 1.1-.79 2-1.8 2Z" />
+    </svg>
+  );
+}
+
+/** Ícone do YouTube. */
+export function IconeYouTube({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M23 12s0-3.4-.43-5.03a2.6 2.6 0 0 0-1.83-1.84C19.11 4.7 12 4.7 12 4.7s-7.11 0-8.74.43c-.9.24-1.6.95-1.83 1.84C1 8.6 1 12 1 12s0 3.4.43 5.03c.24.9.94 1.6 1.83 1.84 1.63.43 8.74.43 8.74.43s7.11 0 8.74-.43a2.6 2.6 0 0 0 1.83-1.84C23 15.4 23 12 23 12ZM9.75 15.27V8.73L15.5 12l-5.75 3.27Z" />
+    </svg>
+  );
+}
+
+/** Ícone do X (antigo Twitter). */
+export function IconeX({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.53 3H21l-7.19 8.21L21.75 21H15.3l-4.7-6.14L5.2 21H1.73l7.5-8.56L1.5 3h6.6l4.35 5.75L17.53 3Zm-1.2 16h1.9L7.6 4.9H5.6l10.73 14.1Z" />
+    </svg>
+  );
+}
+
+/**
+ * Escolhe o ícone pela rede.
+ *
+ * Fica aqui, e não em `lib/marca.ts`, porque aquele módulo é só dados: ele não
+ * deve conhecer JSX, para poder ser importado de qualquer lugar.
+ */
+export function IconeRede({ id, className }: { id: string; className?: string }) {
+  switch (id) {
+    case "github":
+      return <IconeGitHub className={className} />;
+    case "instagram":
+      return <IconeInstagram className={className} />;
+    case "discord":
+      return <IconeDiscord className={className} />;
+    case "linkedin":
+      return <IconeLinkedIn className={className} />;
+    case "youtube":
+      return <IconeYouTube className={className} />;
+    case "x":
+      return <IconeX className={className} />;
+    default:
+      return <IconeInfo className={className} />;
+  }
+}
+
+/**
+ * Ícone do Windows: quatro painéis, o desenho clássico de "aplicativo para PC".
+ *
+ * Preenchido, e não em traço como os demais, porque este aparece dentro do botão
+ * de download — ao lado de texto branco, um contorno fino sumiria.
+ */
+export function IconeWindows({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M3 5.6l7.2-1v7.2H3V5.6zM11.2 4.4L21 3v8.8h-9.8V4.4zM3 12.8h7.2v7.2L3 19V12.8zM11.2 12.8H21V21l-9.8-1.4v-6.8z" />
+    </svg>
+  );
+}
+
+/** Ícone de link externo: marca que o clique sai do site. */
+export function IconeExterno({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M14 4h6v6M20 4l-8.5 8.5" />
+      <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
     </svg>
   );
 }

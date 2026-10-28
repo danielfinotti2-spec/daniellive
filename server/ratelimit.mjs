@@ -46,7 +46,6 @@ export const COST_BY_TYPE = {
   sharing: 1,
   signal: 1,
   requestStream: 1,
-  chatsend: 1,
 };
 
 export function costFor(type) {

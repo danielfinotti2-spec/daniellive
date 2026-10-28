@@ -1,10 +1,11 @@
 {
-  "name": "screenlive",
+  "name": "daniellive",
   "version": "1.0.0",
   "private": true,
-  "description": "ScreenLive — compartilhamento de tela pelo navegador, sem instalar nada.",
+  "description": "DanielLive — compartilhamento de tela em segundos, pelo navegador ou pelo aplicativo.",
   "license": "MIT",
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "concurrently -n web,signal -c cyan,magenta \"next dev -p 3000\" \"node server/index.mjs\"",
     "dev:web": "next dev -p 3000",
@@ -19,13 +20,19 @@
     "test:signaling": "node --test tests/signaling.e2e.mjs",
     "test:browser": "node tests/browser.e2e.mjs",
     "test:scenarios": "node tests/scenarios.e2e.mjs",
-    "screenshots": "node tests/screenshots.mjs"
+    "test:abertura": "node tests/abertura.mjs",
+    "test:abas": "node tests/abas.e2e.mjs",
+    "test:pacote-servir": "node tests/pacote-servir.mjs",
+    "screenshots": "node tests/screenshots.mjs",
+    "desktop": "electron .",
+    "test:desktop": "node tests/desktop.e2e.mjs",
+    "build:desktop": "node scripts/build-windows.mjs",
+    "dist": "electron-builder --config electron-builder.config.cjs --win"
   },
   "dependencies": {
-    "next": "16.3.1",
+    "next": "^16.4.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-icons": "^5.7.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -34,9 +41,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.5.13",
+    "app-builder-lib": "^26.18.0",
     "concurrently": "^9.1.2",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.1",
+    "eslint-config-next": "^16.4.3",
     "playwright-core": "^1.64.1",
     "tailwindcss": "^4",
     "typescript": "^5"

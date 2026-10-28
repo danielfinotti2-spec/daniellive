@@ -1,8 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { CartaoCriarTransmissao, FormularioEntrar } from "@/components/HomeActions";
-import { Cartao, IconeCheck } from "@/components/ui";
+import { Cartao } from "@/components/ui";
+import { RedesSociais } from "@/components/RedesSociais";
+import { TextoAmbiente, TrechoAmbiente, ItemRecurso } from "@/components/TextoAmbiente";
+import { useTexto } from "@/lib/idioma";
 
 export default function Home() {
+  const t = useTexto();
   return (
     <>
       {/* Primeira tela: a altura desconta o cabeçalho para o conteúdo ficar
@@ -12,34 +18,33 @@ export default function Home() {
           <div className="w-full max-w-xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
               <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-500" />
-              Grátis, sem conta e sem instalar nada
+              {/* No site, "sem instalar nada" é o argumento. No aplicativo, quem
+                  lê já instalou — o argumento passa a ser não precisar de conta. */}
+              <TextoAmbiente web={t.home.seloWeb} app={t.home.seloApp} />
             </span>
 
             <h1 className="mt-5 text-3xl font-bold leading-[1.15] tracking-tight text-zinc-950 sm:text-4xl lg:text-5xl dark:text-zinc-50">
-              Mostre sua tela
+              {t.home.titulo}
               <br />
-              <span className="text-broadcast">mandando um link.</span>
+              <span className="text-broadcast">{t.home.tituloDestaque}</span>
             </h1>
 
             <p className="mt-5 max-w-lg text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
-              O ScreenLive abre uma sala no navegador e liga quem apresenta a quem assiste, direto
-              de um para o outro. Não há programa para instalar nem conta para criar — só o link.
+              <TrechoAmbiente web={t.home.subtituloWeb} app={t.home.subtituloApp} />
             </p>
 
+            {/*
+              Aqui havia o mascote acompanhado da descrição do produto. Os dois
+              saíram: o pato já aparece no cabeçalho, e repeti-lo ao lado de um
+              texto que apenas reformulava o parágrafo acima ocupava a dobra sem
+              acrescentar nada. A lista de recursos começa logo abaixo do título.
+            */}
+
             <ul className="mt-7 grid gap-2.5 sm:grid-cols-2">
-              {[
-                "Chrome, Edge, Firefox e Safari",
-                "Assistir pelo celular funciona",
-                "Pode incluir o áudio da aba",
-                "Nada fica gravado no servidor",
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2.5 text-sm">
-                  <span aria-hidden className="mt-0.5 shrink-0 text-broadcast">
-                    <IconeCheck className="h-4 w-4" />
-                  </span>
-                  <span className="text-zinc-700 dark:text-zinc-300">{item}</span>
-                </li>
-              ))}
+              <ItemRecurso web={t.home.recursoNavegadoresWeb} app={t.home.recursoNavegadoresApp} />
+              <ItemRecurso web={t.home.recursoCelularWeb} app={t.home.recursoCelularApp} />
+              <ItemRecurso web={t.home.recursoAudioWeb} app={t.home.recursoAudioApp} />
+              <ItemRecurso web={t.home.recursoGravacaoWeb} app={t.home.recursoGravacaoApp} />
             </ul>
           </div>
 
@@ -47,10 +52,10 @@ export default function Home() {
               fazer, e dividir espaço com o texto o colocaria em segundo lugar. */}
           <Cartao className="w-full max-w-md p-5 sm:p-7" id="entrar">
             <h2 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              Começar agora
+              {t.home.comecarAgora}
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Crie uma sala e receba um link para convidar quem quiser.
+              {t.home.comecarDescricao}
             </p>
 
             <div className="mt-6">
@@ -59,7 +64,7 @@ export default function Home() {
 
             <div className="my-6 flex items-center gap-3">
               <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-              <span className="text-xs text-zinc-400 dark:text-zinc-600">ou</span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-600">{t.home.ou}</span>
               <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
             </div>
 
@@ -72,29 +77,33 @@ export default function Home() {
       <section className="border-t border-black/5 bg-zinc-50 px-4 py-16 dark:border-white/5 dark:bg-black">
         <div className="mx-auto w-full max-w-6xl">
           <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">
-            Como funciona
+            {t.home.passosTitulo}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-center text-sm text-zinc-500 dark:text-zinc-400">
-            Não há nada para configurar. O navegador cuida da conexão entre as duas pontas.
+            <TrechoAmbiente web={t.home.passosWeb} app={t.home.passosApp} />
           </p>
 
           <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                titulo: "Crie a transmissão",
-                texto: "Escolha um nome e a sala é criada com um código próprio.",
+                titulo: t.home.passo1Titulo,
+                texto: t.home.passo1Web,
+                textoApp: t.home.passo1App,
               },
               {
-                titulo: "Copie o link",
-                texto: "Um endereço único para mandar por onde você já conversa.",
+                titulo: t.home.passo2Titulo,
+                texto: t.home.passo2Web,
+                textoApp: t.home.passo2App,
               },
               {
-                titulo: "Compartilhe a tela",
-                texto: "Você escolhe a tela, a janela ou a aba. Nada é capturado sem isso.",
+                titulo: t.home.passo3Titulo,
+                texto: t.home.passo3Web,
+                textoApp: t.home.passo3App,
               },
               {
-                titulo: "A pessoa abre e vê",
-                texto: "Quem receber o link assiste na hora, sem instalar nada.",
+                titulo: t.home.passo4Titulo,
+                texto: t.home.passo4Web,
+                textoApp: t.home.passo4App,
               },
             ].map((passo, i) => (
               <li key={passo.titulo}>
@@ -109,7 +118,7 @@ export default function Home() {
                     {passo.titulo}
                   </h3>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    {passo.texto}
+                    <TextoAmbiente web={passo.texto} app={passo.textoApp} />
                   </p>
                 </Cartao>
               </li>
@@ -121,7 +130,7 @@ export default function Home() {
               href="/como-funciona"
               className="text-sm font-medium text-broadcast underline underline-offset-2 hover:text-broadcast-strong"
             >
-              Ver as instruções completas e as dúvidas comuns
+              {t.home.verInstrucoes}
             </Link>
           </div>
         </div>
@@ -130,34 +139,43 @@ export default function Home() {
       {/* Privacidade: a pergunta que sempre vem antes de compartilhar a tela. */}
       <section className="border-t border-black/5 bg-zinc-50 px-4 py-16 dark:border-white/5 dark:bg-black">
         <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-3">
-          {[
-            {
-              titulo: "A imagem não passa pelo servidor",
-              texto:
-                "Ela viaja direto de um navegador para o outro, cifrada pelo próprio WebRTC. O servidor só apresenta as duas pontas uma à outra.",
-            },
-            {
-              titulo: "Você decide o que mostrar",
-              texto:
-                "O navegador sempre pergunta antes de capturar, e mostra uma barra enquanto isso dura. Fechar essa barra encerra a transmissão.",
-            },
-            {
-              titulo: "Nada é gravado",
-              texto:
-                "Não há gravação nem histórico. Quando todo mundo sai da sala, ela deixa de existir no servidor.",
-            },
-          ].map((item) => (
-            <Cartao key={item.titulo} className="p-5">
-              <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-                {item.titulo}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                {item.texto}
-              </p>
-            </Cartao>
-          ))}
+          <Cartao className="p-5">
+            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+              {t.home.privacidade.titulo1}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <TrechoAmbiente
+                web={t.home.privacidade.texto1Web}
+                app={t.home.privacidade.texto1App}
+              />
+            </p>
+          </Cartao>
+
+          <Cartao className="p-5">
+            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+              {t.home.privacidade.titulo2}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <TrechoAmbiente
+                web={t.home.privacidade.texto2Web}
+                app={t.home.privacidade.texto2App}
+              />
+            </p>
+          </Cartao>
+
+          <Cartao className="p-5">
+            <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
+              {t.home.privacidade.titulo3}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              {t.home.privacidade.texto3}
+            </p>
+          </Cartao>
         </div>
       </section>
+
+      {/* Redes sociais: quem gostou do que viu costuma querer acompanhar. */}
+      <RedesSociais />
     </>
   );
 }

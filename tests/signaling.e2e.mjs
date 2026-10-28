@@ -141,7 +141,7 @@ describe("fluxo completo de sinalização", () => {
     assert.equal(typeof health.rooms, "number");
 
     const metrics = await fetch(`http://127.0.0.1:${PORT}/metrics`).then((r) => r.text());
-    assert.match(metrics, /screenlive_rooms \d+/);
+    assert.match(metrics, /daniellive_rooms \d+/);
   });
 
   test("cria sala, entra pelo código e troca sinais", async () => {
@@ -229,15 +229,19 @@ describe("fluxo completo de sinalização", () => {
     );
     assert.match(iceHost.data.candidate.candidate, /5001/);
 
-    // --- recado no chat chega a todos --------------------------------------
-    viewer.send({ type: "chatsend", text: "consegui ver!" });
-    const chatHost = await host.next("chat");
-    assert.equal(chatHost.text, "consegui ver!");
-    assert.equal(chatHost.from, "Bia");
-    const chatViewer = await viewer.next(
-      (m) => m.type === "chat" && m.text === "consegui ver!",
-    );
-    assert.equal(chatViewer.from, "Bia");
+    // --- pausa é propagada a todos ------------------------------------------
+    // Quem transmite recebe `sharing-ok` (confirmação do próprio pedido); os
+    // demais recebem `sharing` com o campo `paused`.
+    host.send({ type: "sharing", on: true, paused: true });
+    const pausaViewer = await viewer.next((m) => m.type === "sharing" && m.paused === true);
+    assert.equal(pausaViewer.on, true, "pausar não encerra o compartilhamento");
+    const pausaOk = await host.next((m) => m.type === "sharing-ok" && m.paused === true);
+    assert.equal(pausaOk.on, true);
+
+    // Retomar também chega, e com `paused: false`.
+    host.send({ type: "sharing", on: true, paused: false });
+    const retomou = await viewer.next((m) => m.type === "sharing" && m.paused === false);
+    assert.equal(retomou.on, true, "retomar mantém a transmissão ativa");
 
     // --- espectador sai -----------------------------------------------------
     viewer.send({ type: "leave" });
@@ -405,7 +409,7 @@ describe("fluxo completo de sinalização", () => {
 
   test("mensagens grandes demais são recusadas", async () => {
     const client = await new TestClient("grande").connect();
-    client.ws.send(JSON.stringify({ type: "chatsend", text: "x".repeat(300 * 1024) }));
+    client.ws.send(JSON.stringify({ type: "signal", to: "abc", data: { pad: "x".repeat(300 * 1024) } }));
     // O servidor pode fechar a conexão (maxPayload) ou responder erro; os dois
     // são aceitáveis, o que não pode é processar a mensagem.
     const resultado = await Promise.race([

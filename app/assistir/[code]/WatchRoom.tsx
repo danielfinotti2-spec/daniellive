@@ -16,37 +16,7 @@ import {
   cx,
 } from "@/components/ui";
 import { useViewer } from "@/lib/useViewer";
-
-/**
- * Salas em que o código não tem o formato esperado.
- *
- * Checar antes de abrir o WebSocket evita uma ida ao servidor só para receber
- * um erro que dá para saber daqui.
- */
-export function CodigoInvalido({ code }: { code: string }) {
-  return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
-      <span aria-hidden className="text-zinc-300 dark:text-zinc-700">
-        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7.5v5M12 16h.01" />
-        </svg>
-      </span>
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-        Este código não parece válido
-      </h1>
-      <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-        O código de uma sala do ScreenLive tem 9 caracteres, como{" "}
-        <span className="font-mono text-zinc-700 dark:text-zinc-300">K7M2PQR4T</span>. O que veio no
-        endereço foi{" "}
-        <span className="font-mono break-all text-zinc-700 dark:text-zinc-300">{code}</span>.
-      </p>
-      <Botao variant="primario" onClick={() => (window.location.href = "/")}>
-        Voltar ao início
-      </Botao>
-    </div>
-  );
-}
+import { preencher, useTexto, type Dicionario } from "@/lib/idioma";
 
 /**
  * A sala de quem assiste.
@@ -56,6 +26,7 @@ export function CodigoInvalido({ code }: { code: string }) {
  * um retângulo preto mudo não distingue "aguardando o anfitrião" de "erro".
  */
 export function WatchRoom({ code }: { code: string }) {
+  const t = useTexto();
   const [nome, setNome] = useNomeGuardado();
   const nomePronto = nome.trim().length > 0;
   const viewer = useViewer({ code, name: nome.trim() || "Espectador" });
@@ -93,19 +64,22 @@ export function WatchRoom({ code }: { code: string }) {
         <Link
           href="/"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
-          aria-label="Voltar ao início"
+          aria-label={t.assistir.voltarAoInicio}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M19 12H5M11 18l-6-6 6-6" />
           </svg>
         </Link>
         <h1 className="truncate text-base font-semibold tracking-tight text-zinc-950 sm:text-lg dark:text-zinc-50">
-          {viewer.hostName ? `Transmissão de ${viewer.hostName}` : "Sala de transmissão"}
+          {viewer.hostName
+            ? preencher(t.assistir.transmissaoDe, { nome: viewer.hostName })
+            : t.assistir.salaDeTransmissao}
         </h1>
         <span className="shrink-0 rounded-full bg-zinc-200 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
           {code}
         </span>
         <SeloAoVivo ativo={recebendo} />
+        {viewer.paused && <Selo tom="aviso">{t.assistir.pausada}</Selo>}
         <SeloSinalizacao status={viewer.status} />
       </div>
 
@@ -117,28 +91,39 @@ export function WatchRoom({ code }: { code: string }) {
               <PalcoVideo
                 stream={viewer.remote}
                 videoRef={videoRef}
-                nome={viewer.hostName || "Apresentador"}
+                nome={viewer.hostName || t.assistir.apresentador}
                 papel="espectador"
                 aoVivo={recebendo}
                 compacto
                 className="rounded-none"
-                legenda={textoDoPalco(viewer.phase, viewer.hostName)}
+                legenda={textoDoPalco(viewer.phase, viewer.hostName, t)}
               />
 
-              {/* Enquanto o vídeo não chega, o estado fica por cima do preto. */}
-              {!recebendo && (
-                <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-6 text-center">
+              {/* Enquanto o vídeo não chega, o estado fica por cima do preto.
+                  Com a transmissão pausada, o aviso também aparece: uma imagem
+                  parada sem explicação é indistinguível de uma conexão travada. */}
+              {(!recebendo || viewer.paused) && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/40 px-6 text-center">
                   {(viewer.phase === "conectando" || viewer.phase === "aguardando") && (
                     <Spinner className="h-6 w-6 text-white/50" />
                   )}
                   <p className="text-sm font-medium text-white/70">
-                    {textoDoPalco(viewer.phase, viewer.hostName)}
+                    {viewer.paused
+                      ? preencher(t.assistir.pausouTransmissao, {
+                          nome: viewer.hostName || t.assistir.quemApresenta,
+                        })
+                      : textoDoPalco(viewer.phase, viewer.hostName, t)}
                   </p>
-                  {viewer.phase === "aguardando" && (
+                  {viewer.paused ? (
                     <p className="max-w-sm text-xs text-white/40">
-                      A página se conecta sozinha assim que a transmissão começar. Você pode deixá-la
-                      aberta.
+                      {t.assistir.pausadaDica}
                     </p>
+                  ) : (
+                    viewer.phase === "aguardando" && (
+                      <p className="max-w-sm text-xs text-white/40">
+                        {t.assistir.aguardandoDica}
+                      </p>
+                    )
                   )}
                 </div>
               )}
@@ -148,8 +133,8 @@ export function WatchRoom({ code }: { code: string }) {
                   <button
                     type="button"
                     onClick={() => void alternarTelaCheia()}
-                    aria-label={telaCheia ? "Sair da tela cheia" : "Ver em tela cheia"}
-                    title={telaCheia ? "Sair da tela cheia" : "Ver em tela cheia"}
+                    aria-label={telaCheia ? t.assistir.telaCheiaSair : t.assistir.telaCheiaVer}
+                    title={telaCheia ? t.assistir.telaCheiaSair : t.assistir.telaCheiaVer}
                     className="cursor-pointer rounded-full bg-black/60 p-2 text-white transition hover:bg-black/80"
                   >
                     {telaCheia ? (
@@ -169,37 +154,36 @@ export function WatchRoom({ code }: { code: string }) {
 
           {/* Falhas: cada estado diz o que fazer, não só o que houve. */}
           {viewer.phase === "inexistente" && (
-            <Aviso tom="erro" titulo="Esta sala não existe (ou já terminou)">
-              Confira o link com quem enviou. Salas deixam de existir quando o apresentador sai e
-              ninguém mais está assistindo.
+            <Aviso tom="erro" titulo={t.assistir.naoExisteTitulo}>
+              {t.assistir.naoExisteTexto}
             </Aviso>
           )}
           {viewer.phase === "cheia" && (
-            <Aviso tom="aviso" titulo="A sala está cheia">
-              O limite é de 32 pessoas assistindo ao mesmo tempo. Tente de novo em alguns minutos.
+            <Aviso tom="aviso" titulo={t.assistir.cheiaTitulo}>
+              {t.assistir.cheiaTexto}
             </Aviso>
           )}
           {viewer.phase === "encerrada" && (
-            <Aviso tom="info" titulo="A transmissão terminou">
-              Quem apresentava encerrou o compartilhamento. Você pode fechar esta página.
+            <Aviso tom="info" titulo={t.assistir.encerradaTitulo}>
+              {t.assistir.encerradaTexto}
             </Aviso>
           )}
           {viewer.phase === "erro" && (
             <Aviso
               tom="erro"
-              titulo="Não foi possível ver o vídeo"
+              titulo={t.assistir.erroTitulo}
               acao={
                 <Botao variant="secundario" size="sm" onClick={viewer.retry}>
-                  Tentar de novo
+                  {t.assistir.tentarDeNovo}
                 </Botao>
               }
             >
-              {viewer.error ?? "A conexão falhou."}
+              {viewer.error ?? t.assistir.erroTexto}
             </Aviso>
           )}
           {viewer.connectionState === "disconnected" && recebendo && (
-            <Aviso tom="aviso" titulo="A conexão caiu, tentando reconectar">
-              A imagem volta sozinha quando a rede se recuperar.
+            <Aviso tom="aviso" titulo={t.assistir.caiuTitulo}>
+              {t.assistir.caiuTexto}
             </Aviso>
           )}
         </div>
@@ -207,11 +191,11 @@ export function WatchRoom({ code }: { code: string }) {
         {/* Coluna lateral */}
         <div className="flex min-w-0 flex-col gap-4">
           {precisaNome && (
-            <CartaoSecao titulo="Diga seu nome" descricao="Para o apresentador saber quem entrou.">
+            <CartaoSecao titulo={t.assistir.digaSeuNome} descricao={t.assistir.paraSaberQuemEntrou}>
               <CampoNome
                 valor={nome}
                 onChange={setNome}
-                rotulo="Seu nome"
+                rotulo={t.assistir.seuNome}
                 autoFoco
                 onSubmit={() => undefined}
               />
@@ -219,20 +203,18 @@ export function WatchRoom({ code }: { code: string }) {
           )}
 
           <CartaoSecao
-            titulo="Nesta sala"
+            titulo={t.assistir.nestaSala}
             descricao={
-              viewer.participants.length === 0
-                ? "Só você por aqui."
-                : "Quem transmite aparece marcado."
+              viewer.participants.length === 0 ? t.assistir.soVoce : t.assistir.quemTransmiteMarcado
             }
             contagem={viewer.participants.length}
           >
             {viewer.participants.length === 0 ? (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Ninguém na sala ainda.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.assistir.ninguemNaSala}</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {viewer.participants.map((p) => {
-                  const transmite = p.id === viewer.sharing;
+                  const transmite = Boolean(p.isSharing);
                   return (
                     <li
                       key={p.id}
@@ -255,7 +237,7 @@ export function WatchRoom({ code }: { code: string }) {
                           {p.id === viewer.participants[0]?.id && !transmite ? "" : ""}
                         </span>
                       </span>
-                      {transmite && <Selo tom="ao-vivo">Apresentando</Selo>}
+                      {transmite && <Selo tom="ao-vivo">{t.assistir.apresentando}</Selo>}
                     </li>
                   );
                 })}
@@ -263,11 +245,11 @@ export function WatchRoom({ code }: { code: string }) {
             )}
           </CartaoSecao>
 
-          <CartaoSecao titulo="Convidar mais gente" descricao="Envie o mesmo link para quem quiser.">
+          <CartaoSecao titulo={t.assistir.convidarMaisGente} descricao={t.assistir.envieMesmoLink}>
             <div className="flex flex-col gap-2">
               <BotaoCopiar
                 texto={typeof window !== "undefined" ? window.location.href : ""}
-                rotulo="Copiar este link"
+                rotulo={t.assistir.copiarEsteLink}
                 variant="secundario"
                 className="w-full"
               />
@@ -276,12 +258,12 @@ export function WatchRoom({ code }: { code: string }) {
 
           <Cartao className="p-4">
             <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              Se a imagem travar
+              {t.assistir.dicaRedeTitulo}
             </h3>
             <ul className="mt-2 flex flex-col gap-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              <li>Feche outras abas que estejam usando a rede.</li>
-              <li>Prefira o cabo ao Wi-Fi, quando houver.</li>
-              <li>Peça para quem transmite escolher uma qualidade menor.</li>
+              <li>{t.assistir.dicaRede1}</li>
+              <li>{t.assistir.dicaRede2}</li>
+              <li>{t.assistir.dicaRede3}</li>
             </ul>
           </Cartao>
         </div>
@@ -290,22 +272,31 @@ export function WatchRoom({ code }: { code: string }) {
   );
 }
 
-/** Uma frase por estado — as mesmas palavras no palco e por cima dele. */
-function textoDoPalco(phase: string, hostName: string): string {
+/**
+ * Uma frase por estado — as mesmas palavras no palco e por cima dele.
+ *
+ * Recebe o dicionário em vez de ler o idioma: é chamada no meio da renderização
+ * a partir de um valor já calculado, e passar o texto pronto mantém a função
+ * pura e trivial de testar. Os casos são os valores de `ViewerPhase`, e o
+ * `default` cobre "erro" e qualquer estado futuro que ninguém previu.
+ */
+function textoDoPalco(phase: string, hostName: string, t: Dicionario): string {
   switch (phase) {
     case "conectando":
-      return "Entrando na sala…";
+      return t.assistir.entrando;
     case "aguardando":
-      return hostName ? `${hostName} ainda não começou` : "Aguardando o apresentador";
+      return hostName
+        ? preencher(t.assistir.aindaNaoComecou, { nome: hostName })
+        : t.assistir.aguardandoApresentador;
     case "recebendo":
-      return "Conectado";
+      return t.assistir.conectado;
     case "encerrada":
-      return "A transmissão terminou";
+      return t.assistir.transmissaoTerminou;
     case "inexistente":
-      return "Sala não encontrada";
+      return t.assistir.salaNaoEncontrada;
     case "cheia":
-      return "Sala cheia";
+      return t.assistir.salaCheia;
     default:
-      return "Não foi possível conectar";
+      return t.assistir.naoFoiPossivelConectar;
   }
 }

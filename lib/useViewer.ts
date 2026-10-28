@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SignalingClient, type SignalingStatus } from "./signaling";
 import { ViewerPeer, connectionHelp } from "./webrtc";
 import type { Participant, SignalPayload } from "./protocol";
+import { useTexto, useIdioma, dicionario } from "./idioma";
 
 export type ViewerPhase =
   | "conectando" // abrindo o WebSocket
@@ -27,6 +28,28 @@ export function useViewer({ code, name }: { code: string; name: string }) {
   const hostIdRef = useRef<string | null>(null);
   const retryRef = useRef(0);
 
+  /*
+   * O idioma numa ref, atualizado por um efeito.
+   *
+   * As mensagens de erro nascem em callbacks de eventos do WebSocket, que são
+   * registrados uma vez e continuam valendo depois. Se elas fechassem sobre o
+   * dicionário do primeiro render, trocar de idioma no meio de uma conexão
+   * faria o erro seguinte sair no idioma antigo — e o efeito que abre a conexão
+   * depende de uma lista fixa de dependências, então o callback nem seria
+   * recriado.
+   *
+   * A escrita fica num efeito, e não no corpo do render: escrever numa ref
+   * durante a renderização é impuro (o React pode descartar o render e a
+   * escrita valeria para um estado que nunca chegou à tela). O efeito roda
+   * depois de cada render em que o idioma muda, que é exatamente quando a ref
+   * precisa acompanhar.
+   */
+  const idioma = useIdioma();
+  const idiomaRef = useRef(idioma);
+  useEffect(() => {
+    idiomaRef.current = idioma;
+  }, [idioma]);
+
   const [status, setStatus] = useState<SignalingStatus>("offline");
   const [phase, setPhase] = useState<ViewerPhase>("conectando");
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +57,8 @@ export function useViewer({ code, name }: { code: string; name: string }) {
   const [hostName, setHostName] = useState<string>("Anfitrião");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [sharing, setSharing] = useState(false);
+  /** O anfitrião pausou: a transmissão continua, mas não chegam quadros novos. */
+  const [paused, setPaused] = useState(false);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -100,6 +125,7 @@ export function useViewer({ code, name }: { code: string; name: string }) {
             closePeer();
             setRemote(null);
             setSharing(false);
+            setPaused(false);
             setPhase("encerrada");
           }
           break;
@@ -118,13 +144,16 @@ export function useViewer({ code, name }: { code: string; name: string }) {
         }
         case "sharing": {
           setSharing(message.on);
+          setPaused(message.on && message.paused === true);
           if (message.on) {
-            // O anfitrião começou: pede a oferta.
+            // O anfitrião começou: pede a oferta. Uma pausa não precisa de
+            // oferta nova — a conexão continua de pé, só sem quadros novos.
             requestStream();
             setPhase((current) => (current === "encerrada" ? "aguardando" : current));
           } else {
             closePeer();
             setRemote(null);
+            setPaused(false);
             setPhase("aguardando");
           }
           break;
@@ -139,57 +168,59 @@ export function useViewer({ code, name }: { code: string; name: string }) {
           if (from !== hostIdRef.current) break;
 
           if (message.data.description) {
-            // Nova oferta: substitui qualquer conexão anterior. É assim que a
-            // recuperação funciona sem o espectador recarregar a página.
-            closePeer();
-            const peer = new ViewerPeer(
-              from,
-              (to: string, data: SignalPayload) => client.send({ type: "signal", to, data }),
-              {
-                onTrack: (track, stream) => {
-                  setRemote(stream);
-                  setPhase("recebendo");
-                  setError(null);
-                  retryRef.current = 0;
-                  if (track.kind === "video") {
-                    track.addEventListener("ended", () => {
-                      setPhase("encerrada");
-                    });
-                  }
-                },
-                onStateChange: (state) => {
-                  setConnectionState(state);
-                  if (state === "connected") {
-                    retryRef.current = 0;
+            // O anfitrião manda oferta tanto para abrir a transmissão quanto
+            // para retomar de uma pausa. Reaproveitar a conexão viva é o que
+            // permite retomar sem derrubar o caminho já estabelecido — refazer a
+            // conexão do zero custaria uma nova rodada de ICE e deixaria a faixa
+            // de vídeo muda por tempo indeterminado.
+            const oferta = message.data.description;
+            const atual = peerRef.current;
+            const podeReusar =
+              atual !== null && atual.pc.signalingState === "stable" && !atual.fechado;
+
+            if (!podeReusar) {
+              closePeer();
+              peerRef.current = new ViewerPeer(
+                from,
+                (to: string, data: SignalPayload) => client.send({ type: "signal", to, data }),
+                {
+                  onTrack: (track, stream) => {
+                    setRemote(stream);
+                    setPhase("recebendo");
                     setError(null);
-                  }
-                  if (state === "failed" || state === "disconnected") {
-                    // Uma tentativa automática antes de desistir.
-                    if (retryRef.current < 3) {
-                      retryRef.current += 1;
-                      setAttempt((n) => n + 1);
-                      setTimeout(() => requestStream(), 800 * retryRef.current);
-                    } else {
-                      setError(connectionHelp());
-                      setPhase("erro");
+                    retryRef.current = 0;
+                    if (track.kind === "video") {
+                      track.addEventListener("ended", () => {
+                        setPhase("encerrada");
+                      });
                     }
-                  }
+                  },
+                  onStateChange: (state) => {
+                    setConnectionState(state);
+                    if (state === "connected") {
+                      retryRef.current = 0;
+                      setError(null);
+                    }
+                    if (state === "failed" || state === "disconnected") {
+                      // Uma tentativa automática antes de desistir.
+                      if (retryRef.current < 3) {
+                        retryRef.current += 1;
+                        setAttempt((n) => n + 1);
+                        setTimeout(() => requestStream(), 800 * retryRef.current);
+                      } else {
+                        setError(connectionHelp(dicionario(idiomaRef.current)));
+                        setPhase("erro");
+                      }
+                    }
+                  },
+                  onFailure: () => {
+                    closePeer();
+                  },
                 },
-                onFailure: () => {
-                  if (retryRef.current < 3) {
-                    retryRef.current += 1;
-                    setAttempt((n) => n + 1);
-                    setTimeout(() => requestStream(), 800 * retryRef.current);
-                  } else {
-                    setError(connectionHelp());
-                    setPhase("erro");
-                  }
-                },
-              },
-            );
-            peerRef.current = peer;
-            void peer.acceptOffer(message.data.description).catch(() => {
-              setError("Não foi possível responder ao anfitrião.");
+              );
+            }
+            void peerRef.current?.acceptOffer(oferta).catch(() => {
+              setError(dicionario(idiomaRef.current).erro.naoRespondeuAoAnfitriao);
             });
           } else if (message.data.candidate && peerRef.current) {
             void peerRef.current.addCandidate(message.data.candidate);
@@ -197,7 +228,7 @@ export function useViewer({ code, name }: { code: string; name: string }) {
           break;
         }
         case "server-shutdown": {
-          setError("O servidor está reiniciando. Recarregue a página em instantes.");
+          setError(dicionario(idiomaRef.current).erro.servidorReiniciando);
           setPhase("erro");
           break;
         }
@@ -237,6 +268,8 @@ export function useViewer({ code, name }: { code: string; name: string }) {
     hostName,
     participants,
     sharing,
+    /** O anfitrião pausou: mostrar "pausado" em vez de parecer travado. */
+    paused,
     connectionState,
     attempt,
     retry,

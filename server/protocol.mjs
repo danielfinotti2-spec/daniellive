@@ -88,7 +88,13 @@ const SCHEMAS = {
 
   /** O anfitrião anuncia que começou ou parou de transmitir. */
   sharing: {
-    validate: (m) => (isBool(m.on) ? { on: m.on } : null),
+    // `paused` é opcional: quem só começa ou encerra a transmissão não precisa
+    // informá-lo. Quando vem, precisa ser booleano de verdade.
+    validate: (m) => {
+      if (!isBool(m.on)) return null;
+      if (m.paused !== undefined && !isBool(m.paused)) return null;
+      return { on: m.on, paused: m.paused === true };
+    },
   },
 
   /** Sinal dirigido: `to` é o id de destino, `data` é SDP ou candidato ICE. */
@@ -106,10 +112,6 @@ const SCHEMAS = {
   },
 
   ping: { validate: () => ({}) },
-
-  chatsend: {
-    validate: (m) => (isStr(m.text, 500) ? { text: m.text.trim() } : null),
-  },
 };
 
 /**

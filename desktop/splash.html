@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline';"
+    />
+    <title>DanielLive</title>
+    <style>
+      /*
+       * Tela de abertura do aplicativo.
+       *
+       * Esta janela vive fora do Next: ela precisa aparecer no instante em que o
+       * processo principal sobe, antes de a interface existir e mesmo que o
+       * servidor local demore. Por isso o CSS é repetido aqui em vez de
+       * importado — os valores são os mesmos de app/globals.css, para a abertura
+       * e a interface parecerem a mesma coisa.
+       */
+      :root {
+        --fundo: #101014;
+        --cartao: #1a1a1f;
+        --borda: #313139;
+        --texto: #e9e9ec;
+        --texto-fraco: #a1a1aa;
+        --azul: #3b82f6;
+        --azul-forte: #2563eb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--fundo);
+        color: var(--texto);
+        font-family: "Segoe UI", system-ui, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+        cursor: default;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: 28px 34px;
+        /* Brilho suave ao fundo: dá profundidade sem virar enfeite. */
+        background:
+          radial-gradient(560px 300px at 50% 8%, rgba(59, 130, 246, 0.16), transparent 68%),
+          var(--fundo);
+        transition: opacity 240ms ease;
+      }
+
+      .marca {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        animation: entrar 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      /*
+       * Halo atrás do mascote.
+       *
+       * Dá foco à figura sem desenhar nada novo: é o mesmo azul da marca, bem
+       * difuso. Pulsa devagar, no mesmo compasso do mascote, para o conjunto
+       * respirar em vez de piscar.
+       */
+      .halo {
+        position: absolute;
+        width: 168px;
+        height: 168px;
+        border-radius: 9999px;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.28), transparent 66%);
+        filter: blur(2px);
+        animation: respirar 3.4s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      .palco-marca {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 132px;
+        height: 132px;
+      }
+
+      .pato {
+        position: relative;
+        width: 108px;
+        height: 108px;
+        object-fit: contain;
+        /* Sobe flutuando de leve: é a única coisa que se move sem parar, e é
+           lenta de propósito para não competir com a barra. */
+        animation: flutuar 3.4s ease-in-out infinite;
+        filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+        z-index: 1;
+      }
+
+      .pato[hidden] {
+        display: none;
+      }
+
+      /* Sem a arte do mascote, entra o glifo da marca — nunca um vazio. */
+      .glifo {
+        position: relative;
+        z-index: 1;
+        width: 76px;
+        height: 76px;
+        border-radius: 20px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--azul), #1d4ed8);
+        box-shadow: 0 10px 26px rgba(37, 99, 235, 0.35);
+        animation: flutuar 3.4s ease-in-out infinite;
+      }
+
+      .glifo[hidden] {
+        display: none;
+      }
+
+      .nome {
+        font-size: 25px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+
+      .nome .destaque {
+        color: var(--azul);
+      }
+
+      .versao {
+        font-size: 11.5px;
+        color: var(--texto-fraco);
+        margin: -6px 0 0;
+        letter-spacing: 0.01em;
+      }
+
+      .progresso {
+        width: 100%;
+        max-width: 330px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        animation: entrar 520ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      /* Trilho fino: a barra anda por dentro dele, sem salto de layout. */
+      .trilho {
+        position: relative;
+        height: 4px;
+        border-radius: 9999px;
+        background: var(--cartao);
+        overflow: hidden;
+        /* Um fio de luz na borda separa o trilho do fundo escuro e faz a barra
+           parecer encaixada, em vez de flutuando. */
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+
+      .barra {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 0%;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, var(--azul-forte), var(--azul));
+        /*
+         * A curva é longa porque os passos vêm espaçados: a barra precisa
+         * *alcançar* cada valor, não saltar até ele. `width` anima por layout,
+         * mas são poucos passos por segundo — o custo é desprezível e evita a
+         * complexidade de um transform com cálculo de escala.
+         */
+        transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      /* Brilho que atravessa a barra: sinal de vida durante a espera longa,
+         sem sugerir progresso que não existe. */
+      .barra::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(
+          100deg,
+          transparent 20%,
+          rgba(255, 255, 255, 0.42) 50%,
+          transparent 80%
+        );
+        transform: translateX(-100%);
+        animation: brilhar 2.2s ease-in-out infinite;
+      }
+
+      /* Enquanto o progresso é desconhecido, um brilho atravessa a barra: é
+         honesto (não finge porcentagem) e não deixa a tela parada. */
+      .barra.indeterminada {
+        width: 34% !important;
+        transition: none;
+        animation: atravessar 1.15s ease-in-out infinite;
+      }
+
+      .estado {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--texto-fraco);
+        /* Altura fixa: as mensagens mudam de comprimento durante a abertura e
+           sem isto o bloco inteiro daria um pulo a cada troca. */
+        min-height: 18px;
+        line-height: 18px;
+      }
+
+      .estado .passo {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /* Troca de mensagem com um fade curto em vez de corte seco. */
+        transition: opacity 220ms ease;
+      }
+
+      /* Enquanto o texto troca, ele sai e volta — evita o "pisca" de duas
+         mensagens se sobrepondo no mesmo quadro. */
+      .estado .passo.trocando {
+        opacity: 0;
+      }
+
+      .estado .porcento {
+        font-variant-numeric: tabular-nums;
+        flex-shrink: 0;
+        transition: opacity 220ms ease;
+      }
+
+      .rodape {
+        position: absolute;
+        bottom: 14px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 11px;
+        color: #52525b;
+        animation: entrar 520ms 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      /*
+       * Saída: a abertura entrega a vez para a janela principal por trás dela.
+       *
+       * O conjunto sobe de leve enquanto some — a janela real está aparecendo
+       * atrás, então dá a impressão de continuidade, e não de uma tela que
+       * simplesmente desapareceu.
+       */
+      body.saindo .marca,
+      body.saindo .progresso,
+      body.saindo .rodape {
+        transition:
+          opacity 300ms ease,
+          transform 300ms cubic-bezier(0.4, 0, 1, 1);
+      }
+
+      body.saindo .marca,
+      body.saindo .progresso,
+      body.saindo .rodape {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      body.saindo {
+        opacity: 0;
+        transition: opacity 300ms ease 60ms;
+      }
+
+      @keyframes entrar {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes flutuar {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-7px);
+        }
+      }
+
+      @keyframes atravessar {
+        0% {
+          transform: translateX(-120%);
+        }
+        100% {
+          transform: translateX(400%);
+        }
+      }
+
+      /* Halo que respira no mesmo compasso do mascote. */
+      @keyframes respirar {
+        0%,
+        100% {
+          opacity: 0.75;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.07);
+        }
+      }
+
+      /* Luz que percorre a barra preenchida: movimento contínuo, sem mentir
+         sobre a porcentagem. */
+      @keyframes brilhar {
+        0% {
+          transform: translateX(-100%);
+        }
+        60%,
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      /* Quem pediu menos movimento recebe a tela parada: nada pisca, nada anda. */
+      @media (prefers-reduced-motion: reduce) {
+        .marca,
+        .progresso,
+        .rodape,
+        .pato,
+        .glifo,
+        .halo {
+          animation: none;
+        }
+        /* Sem animação, o brilho da barra ficaria parado no meio dela: sai. */
+        .barra::after {
+          display: none;
+        }
+        .barra {
+          transition: none;
+        }
+        .barra.indeterminada {
+          animation: none;
+          transform: none;
+        }
+        .estado .passo,
+        .estado .porcento {
+          transition: none;
+        }
+        body.saindo,
+        body.saindo .marca,
+        body.saindo .progresso,
+        body.saindo .rodape {
+          transform: none;
+        }
+        body.saindo .marca,
+        body.saindo .progresso,
+        body.saindo .rodape {
+          transition: opacity 220ms ease;
+        }
+        body.saindo {
+          transition: opacity 220ms ease;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="marca">
+      <div class="palco-marca">
+        <span class="halo" aria-hidden></span>
+        <img class="pato" id="pato" alt="" hidden />
+        <span class="glifo" id="glifo" aria-hidden>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="4" width="15" height="11" rx="1.6" />
+            <path d="M6.5 19h7" />
+            <circle cx="19" cy="17" r="2.9" fill="#fff" stroke="none" />
+          </svg>
+        </span>
+      </div>
+      <h1 class="nome">Daniel<span class="destaque">Live</span></h1>
+      <p class="versao" id="versao">Aplicativo para Windows</p>
+    </div>
+
+    <div class="progresso">
+      <div class="trilho">
+        <div class="barra indeterminada" id="barra"></div>
+      </div>
+      <div class="estado">
+        <span class="passo" id="passo">Iniciando…</span>
+        <span class="porcento" id="porcento"></span>
+      </div>
+    </div>
+
+    <p class="rodape">Compartilhamento de tela direto entre computadores</p>
+
+    <script>
+      /*
+       * A ponte é exposta em preload-splash.cjs. O processo principal manda o
+       * passo atual e a porcentagem quando ela é conhecida; a janela só desenha.
+       */
+      const ponte = window.splash;
+
+      const barra = document.getElementById("barra");
+      const passo = document.getElementById("passo");
+      const porcento = document.getElementById("porcento");
+
+      /*
+       * Troca a mensagem com um fade curto.
+       *
+       * Sem isto o texto é substituído no mesmo quadro, e uma troca seca durante
+       * a abertura parece falha. O atraso é menor que a transição do CSS, então
+       * uma sequência rápida de mensagens não fica esperando a anterior.
+       */
+      const trocarPasso = (texto) => {
+        if (passo.textContent === texto) return;
+        passo.classList.add("trocando");
+        setTimeout(() => {
+          passo.textContent = texto;
+          passo.classList.remove("trocando");
+        }, 150);
+      };
+
+      ponte?.aoAtualizar(({ texto, valor }) => {
+        if (typeof texto === "string" && texto) trocarPasso(texto);
+
+        if (typeof valor === "number" && valor >= 0) {
+          barra.classList.remove("indeterminada");
+          barra.style.width = Math.max(0, Math.min(100, valor)) + "%";
+          porcento.textContent = Math.round(valor) + "%";
+        } else {
+          // Sem valor conhecido: barra indeterminada, sem número inventado.
+          barra.classList.add("indeterminada");
+          barra.style.width = "";
+          porcento.textContent = "";
+        }
+      });
+
+      // A arte entra como data URL: o splash não tem acesso a arquivos nem a
+      // protocolo próprio, e o mascote precisa aparecer mesmo se o servidor
+      // local ainda não subiu.
+      ponte?.aoReceberArte((arte) => {
+        const img = document.getElementById("pato");
+        const glifo = document.getElementById("glifo");
+        if (arte) {
+          img.src = arte;
+          img.hidden = false;
+          glifo.hidden = true;
+        } else {
+          img.hidden = true;
+          glifo.hidden = false;
+        }
+      });
+
+      ponte?.aoReceberVersao((texto) => {
+        if (texto) document.getElementById("versao").textContent = texto;
+      });
+    </script>
+  </body>
+</html>

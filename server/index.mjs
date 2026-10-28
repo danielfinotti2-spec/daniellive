@@ -1,5 +1,5 @@
 /**
- * ScreenLive — servidor de sinalização.
+ * DanielLive — servidor de sinalização.
  *
  * Papel: manter as salas e encaminhar os sinais WebRTC entre o anfitrião e os
  * espectadores. A mídia nunca passa por aqui — o vídeo vai direto de um
@@ -35,6 +35,25 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
   .map((s) => s.trim())
   .filter(Boolean);
 
+/**
+ * Em produção, uma lista vazia é uma falha de configuração, não um padrão.
+ *
+ * Sem ela, qualquer site pode abrir um WebSocket aqui e usar este servidor como
+ * transporte de graça — e o operador nunca descobre, porque nada avisa. Recusar
+ * a subir é melhor do que subir inseguro e silencioso. Em desenvolvimento a
+ * lista vazia continua valendo, para não atrapalhar quem está testando.
+ */
+const PRODUCAO = process.env.NODE_ENV === "production";
+if (PRODUCAO && ALLOWED_ORIGINS.length === 0) {
+  console.error(
+    "[daniellive] ALLOWED_ORIGINS não foi definido e NODE_ENV=production.\n" +
+      "             Defina a lista de origens autorizadas, separadas por vírgula:\n" +
+      "             ALLOWED_ORIGINS=https://seudominio.com,https://www.seudominio.com\n" +
+      "             Para permitir qualquer origem (só atrás de um proxy que já valide), use ALLOWED_ORIGINS=*.",
+  );
+  process.exit(1);
+}
+
 const log = (...args) => {
   const stamp = new Date().toISOString();
   console.log(`[${stamp}]`, ...args);
@@ -63,8 +82,8 @@ const httpServer = createServer((req, res) => {
   if (req.url === "/metrics") {
     // Formato de texto simples, sem dependência: é o que um `curl` mostra.
     const lines = [
-      `screenlive_rooms ${registry.size}`,
-      `screenlive_connections ${connections.size}`,
+      `daniellive_rooms ${registry.size}`,
+      `daniellive_connections ${connections.size}`,
     ];
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
     res.end(lines.join("\n") + "\n");
@@ -275,15 +294,19 @@ function handleMessage(ws, state, message) {
     case "sharing": {
       const code = state.roomCode;
       if (!code) return;
+      const pausado = message.paused === true;
       const result = registry.setSharing(code, state.id, message.on);
       if (!result.ok) {
         send(ws, { type: "error", code: result.error });
         return;
       }
-      broadcast(code, { type: "sharing", id: state.id, on: message.on }, state.id);
+      // `paused` faz parte do estado observável da transmissão: quem assiste
+      // precisa saber distinguir "pausado" de "travou", então o campo não pode
+      // ficar só no cliente de quem transmite.
+      broadcast(code, { type: "sharing", id: state.id, on: message.on, paused: pausado }, state.id);
       // O próprio anfitrião confirma o estado para a interface dele não
       // divergir do que o servidor considera verdade.
-      send(ws, { type: "sharing-ok", on: message.on });
+      send(ws, { type: "sharing-ok", on: message.on, paused: pausado });
       if (message.on) {
         // O anfitrião recebe a lista de quem precisa de oferta AGORA, sem
         // esperar o próximo `peer-joined`.
@@ -322,20 +345,6 @@ function handleMessage(ws, state, message) {
       if (host) {
         send(host.ws, { type: "stream-requested", from: state.id, name: state.name });
       }
-      return;
-    }
-
-    case "chatsend": {
-      const code = state.roomCode;
-      if (!code) return;
-      broadcast(code, {
-        type: "chat",
-        id: randomUUID().slice(0, 8),
-        from: state.name || "Anônimo",
-        fromId: state.id,
-        text: message.text,
-        at: Date.now(),
-      });
       return;
     }
 
@@ -413,7 +422,7 @@ httpServer.listen(PORT, HOST, () => {
   log(`sinalização ouvindo em ws://${HOST}:${PORT}`);
   log(`saúde em http://${HOST}:${PORT}/health`);
   if (ALLOWED_ORIGINS.length) log("origens permitidas:", ALLOWED_ORIGINS.join(", "));
-  else log("ALLOWED_ORIGINS vazio: aceitando qualquer origem (use só em desenvolvimento)");
+  else log("ALLOWED_ORIGINS vazio: aceitando qualquer origem (só é aceitável fora de produção)");
 });
 
 export { httpServer, wss, registry };

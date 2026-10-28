@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { BotaoIcone, cx } from "@/components/ui";
+import { preencher, useTexto } from "@/lib/idioma";
 
+/**
+ * A escolha guardada.
+ *
+ * ATENÇÃO: estes literais são **dados**, não texto de interface — vão para o
+ * `localStorage` em `screenlive-theme` e são comparados com o que está lá. Não
+ * entram no dicionário e não podem ser traduzidos: traduzi-los mudaria o valor
+ * gravado e a preferência de tema de todo mundo se perderia em silêncio, sem
+ * erro de compilação para avisar. O que se traduz é só o rótulo exibido.
+ */
 type Escolha = "claro" | "escuro" | "sistema";
 
 const CHAVE = "screenlive-theme";
@@ -24,40 +34,100 @@ function aplicar(escolha: Escolha) {
  * piscar visível. O inicializador roda uma única vez, no cliente.
  */
 export function ThemeToggle({ className }: { className?: string }) {
-  const [escolha, setEscolha] = useState<Escolha>(() => {
-    if (typeof window === "undefined") return "sistema";
-    const salvo = window.localStorage.getItem(CHAVE);
-    return salvo === "claro" || salvo === "escuro" || salvo === "sistema" ? salvo : "sistema";
-  });
+  const t = useTexto();
+  /**
+   * `false` no servidor e na primeira renderização do cliente; `true` logo
+   * depois.
+   *
+   * A preferência real só existe no `localStorage`, que o servidor não tem. Se
+   * o ícone e o rótulo saíssem dela já na primeira renderização, o HTML do
+   * servidor e o do cliente discordariam — que é exatamente o erro de
+   * hidratação do React. Renderizar o estado neutro primeiro e trocar no
+   * cliente mantém as duas saídas iguais.
+   */
+  const montado = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  /**
+   * A escolha guardada, lida como fonte externa.
+   *
+   * `useSyncExternalStore` é o gancho certo aqui: o `localStorage` é um sistema
+   * fora do React, o servidor tem um retrato diferente do cliente (vazio), e o
+   * gancho resolve as duas coisas sem um efeito que chame setState — que
+   * provocaria uma renderização em cascata.
+   */
+  const guardada = useSyncExternalStore(
+    assinarArmazenamento,
+    lerEscolhaGuardada,
+    () => "sistema" as Escolha,
+  );
+  // A escolha da sessão vence a guardada; `null` significa "ainda não mexeu".
+  const [mexida, setMexida] = useState<Escolha | null>(null);
+  const escolha: Escolha = mexida ?? guardada;
 
   useEffect(() => {
+    if (!montado) return;
     aplicar(escolha);
-    localStorage.setItem(CHAVE, escolha);
-    if (escolha !== "sistema") return;
+    if (escolha !== "sistema") {
+      localStorage.setItem(CHAVE, escolha);
+      return;
+    }
     // Em "sistema", acompanha a troca do SO enquanto a página está aberta.
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const aoMudar = () => aplicar("sistema");
     mq.addEventListener("change", aoMudar);
     return () => mq.removeEventListener("change", aoMudar);
-  }, [escolha]);
+  }, [escolha, montado]);
 
-  // Um botão que percorre os três estados, em vez de um menu: são só três e a
-  // troca é reversível e imediata.
-  const proximo: Escolha = escolha === "claro" ? "escuro" : escolha === "escuro" ? "sistema" : "claro";
+  // O ciclo parte do que está na tela, não do rótulo guardado. Em "sistema"
+  // com o SO claro, o próximo estado é "escuro": um primeiro clique que não
+  // muda nada visível parece um botão quebrado.
+  //
+  // O `matchMedia` só existe no cliente, então o alvo do ciclo é calculado no
+  // clique — durante a renderização do servidor isso quebraria a pré-renderização.
+  const proximo: Escolha =
+    escolha === "sistema" ? "escuro" : escolha === "escuro" ? "claro" : "sistema";
+  // O estado comparado acima continua sendo o literal; o que sai daqui é só o
+  // rótulo exibido no `title`/`aria-label` do botão.
   const rotulo =
-    escolha === "claro" ? "Tema claro" : escolha === "escuro" ? "Tema escuro" : "Tema do sistema";
+    escolha === "claro"
+      ? t.nav.temaClaro
+      : escolha === "escuro"
+        ? t.nav.temaEscuro
+        : t.nav.temaSistema;
 
   return (
     <BotaoIcone
-      rotulo={`${rotulo} — clique para mudar`}
-      onClick={() => setEscolha(proximo)}
+      rotulo={montado ? preencher(t.nav.temaMudar, { tema: rotulo }) : t.nav.tema}
+      onClick={() => {
+        // Partindo de "sistema", o alvo é o oposto do que está na tela agora.
+        if (escolha === "sistema") {
+          const escuroAgora = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          setMexida(escuroAgora ? "claro" : "escuro");
+          return;
+        }
+        setMexida(proximo);
+      }}
       className={cx("text-zinc-500 dark:text-zinc-400", className)}
     >
-      {escolha === "claro" && <IconeSol />}
-      {escolha === "escuro" && <IconeLua />}
-      {escolha === "sistema" && <IconeSistema />}
+      {montado && escolha === "claro" && <IconeSol />}
+      {montado && escolha === "escuro" && <IconeLua />}
+      {(!montado || escolha === "sistema") && <IconeSistema />}
     </BotaoIcone>
   );
+}
+
+/** Ouve mudanças do `localStorage` feitas em outra aba. */
+function assinarArmazenamento(aoMudar: () => void) {
+  window.addEventListener("storage", aoMudar);
+  return () => window.removeEventListener("storage", aoMudar);
+}
+
+function lerEscolhaGuardada(): Escolha {
+  const salvo = window.localStorage.getItem(CHAVE);
+  return salvo === "claro" || salvo === "escuro" || salvo === "sistema" ? salvo : "sistema";
 }
 
 function IconeSol() {

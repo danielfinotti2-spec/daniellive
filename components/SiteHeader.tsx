@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BotaoIcone, cx } from "@/components/ui";
+import { SeletorIdioma } from "@/components/SeletorIdioma";
+import { Mascote } from "@/components/Mascote";
+import { cx } from "@/components/ui";
+import { useTexto } from "@/lib/idioma";
 
 /**
  * Barra superior do site.
@@ -19,6 +22,7 @@ import { BotaoIcone, cx } from "@/components/ui";
  */
 export function SiteHeader() {
   const caminho = usePathname();
+  const t = useTexto();
   // Dentro de uma sala a barra some: é uma tela de transmissão com controles
   // próprios, e navegação por cima de uma chamada ao vivo é mobília que
   // ninguém pediu. O rodapé continua, discreto.
@@ -31,11 +35,15 @@ export function SiteHeader() {
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2 transition hover:opacity-80"
-          aria-label="ScreenLive — início"
+          aria-label={`DanielLive — ${t.comum.inicio}`}
         >
-          <Marca />
+          {/* O mascote ocupa o lugar do antigo glifo de monitor. Pequeno (h-7)
+              para não competir com o nome; `object-contain` impossibilita
+              deformação, e o fallback para o glifo ocorre sozinho quando a arte
+              não está no repositório. */}
+          <Mascote tamanho={28} className="h-7 w-7 shrink-0" />
           <span className="text-base font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-            ScreenLive
+            DanielLive
           </span>
         </Link>
 
@@ -53,44 +61,83 @@ export function SiteHeader() {
             <IconeTransmitir />
             {/* Dois rótulos longos não cabem num celular, e dois ícones soltos
                 viram adivinhação — então o rótulo encurta em vez de sumir. */}
-            <span className="hidden sm:inline">Transmitir</span>
-            <span className="sm:hidden">Ao vivo</span>
+            <span className="hidden sm:inline">{t.nav.transmitir}</span>
+            <span className="sm:hidden">{t.nav.aoVivo}</span>
           </Link>
         </nav>
 
         <nav className="ml-auto flex items-center gap-1">
+          {/* No celular estas duas abas ficam só com ícone.
+              A barra já tinha o nome, o botão "Ao vivo", a ajuda e o botão de
+              tema; somando dois rótulos de texto ela passava a 510px numa tela
+              de 390px e a página inteira ganhava rolagem horizontal. O ícone
+              mantém as duas alcançáveis sem empurrar nada para fora — e o
+              `aria-label` garante que quem usa leitor de tela continue sabendo
+              o que cada uma faz.
+              A altura de 40px (contra 27px do padding sozinho) é para o alvo de
+              toque ficar confortável: são as duas abas principais, e errar o
+              toque num celular é o defeito mais fácil de introduzir aqui. */}
+          <Link
+            href="/site"
+            aria-current={caminho === "/site" ? "page" : undefined}
+            aria-label={t.nav.siteRotulo}
+            title={t.nav.siteRotulo}
+            className={cx(
+              "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
+              caminho === "/site"
+                ? "font-medium text-zinc-950 dark:text-zinc-50"
+                : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
+            )}
+          >
+            <IconeNavegador />
+            <span className="hidden md:inline">{t.nav.site}</span>
+          </Link>
+
+          <Link
+            href="/download"
+            aria-current={caminho === "/download" ? "page" : undefined}
+            aria-label={t.nav.downloadRotulo}
+            title={t.nav.downloadRotulo}
+            className={cx(
+              "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
+              caminho === "/download"
+                ? "font-medium text-zinc-950 dark:text-zinc-50"
+                : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
+            )}
+          >
+            <IconeDownload />
+            <span className="hidden md:inline">{t.nav.download}</span>
+          </Link>
+
+          {/* No celular a ajuda some: ela é leitura, e as duas abas acima são
+              escolha. Numa barra apertada, o que informa a decisão fica. */}
           <Link
             href="/como-funciona"
             aria-current={caminho === "/como-funciona" ? "page" : undefined}
             className={cx(
-              "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm transition sm:px-2.5",
+              "hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm transition sm:inline-flex sm:px-2.5",
               caminho === "/como-funciona"
                 ? "font-medium text-zinc-950 dark:text-zinc-50"
                 : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
             )}
           >
             <IconeInterrogacao />
-            <span className="hidden md:inline">Como funciona</span>
-            <span className="md:hidden">Ajuda</span>
+            <span className="hidden md:inline">{t.rodape.comoFunciona}</span>
+            <span className="md:hidden">{t.comum.ajuda}</span>
           </Link>
 
-          {/* Só o ícone de ajuda resta no celular, então o alvo de toque ganha
-              um pouco mais de respiro. */}
-          <BotaoIcone
-            rotulo="Entrar com um código"
-            className="sm:hidden"
-            onClick={() => {
-              const campo = document.getElementById("room-code");
-              if (campo) {
-                campo.scrollIntoView({ behavior: "smooth", block: "center" });
-                (campo as HTMLInputElement).focus();
-              } else {
-                window.location.href = "/#entrar";
-              }
-            }}
+          {/* Entrar com um código não cabe na barra do celular como texto, mas
+              é uma ação — some por último, e por isso vive como ícone. */}
+          <Link
+            href="/#entrar"
+            aria-label={t.comum.entrarComCodigo}
+            title={t.comum.entrarComCodigo}
+            className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-950 sm:hidden dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
           >
             <IconeEntrar />
-          </BotaoIcone>
+          </Link>
+
+          <SeletorIdioma />
 
           <ThemeToggle />
 
@@ -98,27 +145,11 @@ export function SiteHeader() {
             href="/transmitir"
             className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50 lg:inline-flex"
           >
-            Criar transmissão
+            {t.home.criar}
           </Link>
         </nav>
       </div>
     </header>
-  );
-}
-
-/** O símbolo: uma tela com um ponto de transmissão no canto. */
-function Marca() {
-  return (
-    <span
-      aria-hidden
-      className="flex h-6 w-6 items-center justify-center rounded-md bg-broadcast text-white shadow-sm"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-        <rect x="2.5" y="4" width="15" height="11" rx="1.6" />
-        <path d="M6.5 19h7" />
-        <circle cx="19" cy="17" r="2.6" fill="currentColor" stroke="none" />
-      </svg>
-    </span>
   );
 }
 
@@ -127,6 +158,25 @@ function IconeTransmitir() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="shrink-0">
       <rect x="2" y="4" width="20" height="13" rx="2" />
       <path d="M8 21h8M12 17v4" />
+    </svg>
+  );
+}
+
+function IconeDownload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+      <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+    </svg>
+  );
+}
+
+/** Janela de navegador: distingue "usar pelo site" de "baixar o aplicativo". */
+function IconeNavegador() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="shrink-0">
+      <rect x="2.5" y="4" width="19" height="16" rx="2" />
+      <path d="M2.5 9h19" />
+      <path d="M6 6.5h.01M9 6.5h.01" />
     </svg>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconeCheck, cx } from "@/components/ui";
+import { useTexto } from "@/lib/idioma";
 
 /**
  * Copia texto para a área de transferência.
@@ -75,8 +76,8 @@ export function useCopiar() {
 /** Botão de copiar com o rótulo trocando enquanto o retorno está na tela. */
 export function BotaoCopiar({
   texto,
-  rotulo = "Copiar",
-  rotuloCopiado = "Copiado!",
+  rotulo,
+  rotuloCopiado,
   className,
   variant = "secundario",
   size = "md",
@@ -91,6 +92,18 @@ export function BotaoCopiar({
   children?: React.ReactNode;
 }) {
   const { copiar, copiado, falhou } = useCopiar();
+  /*
+   * Os rótulos padrão saem do dicionário dentro do corpo, e não como valor
+   * padrão de parâmetro.
+   *
+   * Valor padrão é avaliado na chamada, fora do corpo do componente — e um hook
+   * não pode rodar ali. Deixar `rotulo = "Copiar"` na assinatura congelaria o
+   * texto em português mesmo com o resto da interface traduzido. Quem passa um
+   * rótulo continua mandando; quem não passa recebe o do idioma em uso.
+   */
+  const t = useTexto();
+  const textoRotulo = rotulo ?? t.comum.copiar;
+  const textoCopiado = rotuloCopiado ?? t.comum.copiado;
 
   return (
     <button
@@ -114,7 +127,7 @@ export function BotaoCopiar({
     >
       {copiado ? <IconeCheck className="h-3.5 w-3.5" /> : <IconeCopiar />}
       {children}
-      <span>{copiado ? rotuloCopiado : falhou ? "Não foi possível" : rotulo}</span>
+      <span>{copiado ? textoCopiado : falhou ? t.comum.naoCopiou : textoRotulo}</span>
     </button>
   );
 }

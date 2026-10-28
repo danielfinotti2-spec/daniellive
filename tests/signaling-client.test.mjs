@@ -152,14 +152,16 @@ describe("cliente de sinalização", () => {
     client.connect();
     const ws = FakeWebSocket.instances.at(-1);
 
-    // Um candidato ICE sem socket aberto não serve para nada depois.
+    // Um candidato ICE sem socket aberto não serve para nada depois. O `sharing`
+    // também é efêmero: descreve o agora, e reenviá-lo depois mentiria sobre o
+    // estado atual da transmissão.
     client.send({ type: "signal", to: "abc", data: { candidate: { candidate: "x" } } });
-    client.send({ type: "chatsend", text: "oi" });
+    client.send({ type: "sharing", on: true });
 
     ws.abrir();
     await respirar();
     assert.equal(quantos(ws, "signal"), 0, "sinal velho não deve ser reenviado");
-    assert.equal(quantos(ws, "chat"), 0);
+    assert.equal(quantos(ws, "sharing"), 0, "estado de compartilhamento não deve ser reenviado");
   });
 
   test("leave esquece o join, então a reconexão não reentra na sala", async (t) => {

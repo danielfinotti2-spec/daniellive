@@ -6,6 +6,7 @@
  */
 
 import { chromium } from "playwright-core";
+import { preparar } from "./idioma-dos-testes.mjs";
 
 const APP = process.env.APP_URL ?? "http://127.0.0.1:3000";
 const CHROME =
@@ -34,31 +35,37 @@ const browser = await chromium.launch({
 
 try {
   // ============================================ VÁRIOS ESPECTADORES (MESH)
-  const hostCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const hostCtx = await preparar(await browser.newContext({ viewport: { width: 1440, height: 900 } }));
   const host = await hostCtx.newPage();
   await host.goto(`${APP}/transmitir`, { waitUntil: "domcontentloaded" });
   await host.locator("#display-name").fill("Ana");
-  await host.getByRole("button", { name: /criar a sala/i }).click();
-  await host.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
-  const link = await host.locator("p.font-mono").first().innerText();
+  // A sala é criada ao abrir a página; o nome só destrava o botão de começar.
+  await host.waitForSelector('[data-campo="link-transmissao"]', { timeout: 25_000 });
+  const link = await host.locator('[data-campo="link-transmissao"]').inputValue();
   const code = link.match(/\/assistir\/([A-Z0-9]{9})/)?.[1];
   registrar("sala criada para o teste de vários espectadores", Boolean(code), code);
 
   // Três espectadores em contextos separados.
   const viewers = [];
   for (let i = 1; i <= 3; i += 1) {
-    const ctx = await browser.newContext({ viewport: { width: 1024, height: 700 } });
+    const ctx = await preparar(await browser.newContext({ viewport: { width: 1024, height: 700 } }));
     const page = await ctx.newPage();
     await page.goto(`${APP}/assistir/${code}`, { waitUntil: "domcontentloaded" });
     viewers.push({ ctx, page });
   }
 
-  // O anfitrião lista os três.
+  // O anfitrião lista os três. A contagem no cabeçalho da seção é o sinal mais
+  // direto — o texto dos selos de estado muda com a velocidade da rede.
   let listados = 0;
   for (let i = 0; i < 30; i += 1) {
-    const texto = await host.locator("aside").first().innerText().catch(() => "");
-    const m = texto.match(/Quem está assistindo\s*\((\d+)\)/);
-    listados = m ? Number(m[1]) : 0;
+    listados = await host.evaluate(() => {
+      const hdr = [...document.querySelectorAll("h2")].find((x) =>
+        /Quem está assistindo/i.test(x.textContent ?? ""),
+      );
+      if (!hdr) return 0;
+      const secao = hdr.closest("div")?.parentElement?.parentElement;
+      return secao?.querySelectorAll("ul li").length ?? 0;
+    });
     if (listados >= 3) break;
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -66,7 +73,7 @@ try {
 
   // Inicia a transmissão.
   await host.getByRole("button", { name: /compartilhar minha tela/i }).click();
-  await host.waitForSelector("text=/AO VIVO/i", { timeout: 30_000 });
+  await host.waitForSelector("text=/Ao vivo/i", { timeout: 30_000 });
 
   // Todos os três precisam receber vídeo de verdade.
   const receberam = [];
@@ -121,9 +128,11 @@ try {
   );
 
   // Encerra pelo botão do anfitrião.
-  await host.getByRole("button", { name: /parar compartilhamento/i }).click();
+  await host.getByRole("button", { name: /^encerrar$/i }).click();
   const encerrou = await viewers[0].page
-    .waitForFunction(() => /terminou|Esperando/i.test(document.body.innerText), { timeout: 15_000 })
+    .waitForFunction(() => /terminou|Aguardando|ainda não começou/i.test(document.body.innerText), {
+      timeout: 15_000,
+    })
     .then(() => true)
     .catch(() => false);
   registrar("todos voltam ao estado de espera ao parar", encerrou);
@@ -132,7 +141,7 @@ try {
   for (const v of viewers) await v.ctx.close().catch(() => {});
 
   // ==================================================== PERMISSÃO NEGADA
-  const negCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const negCtx = await preparar(await browser.newContext({ viewport: { width: 1280, height: 800 } }));
   const neg = await negCtx.newPage();
   // Sobrescreve getDisplayMedia para simular o usuário cancelando a escolha —
   // é exatamente o NotAllowedError que o navegador lança nesse caso.
@@ -145,26 +154,25 @@ try {
   });
   await neg.goto(`${APP}/transmitir`, { waitUntil: "domcontentloaded" });
   await neg.locator("#display-name").fill("Teste");
-  await neg.getByRole("button", { name: /criar a sala/i }).click();
-  await neg.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
+  await neg.waitForSelector('[data-campo="link-transmissao"]', { timeout: 25_000 });
   await neg.getByRole("button", { name: /compartilhar minha tela/i }).click();
   await new Promise((r) => setTimeout(r, 1500));
 
   const textoNegado = await neg.evaluate(() => document.body.innerText);
   registrar(
     "permissão negada é avisada com clareza",
-    /cancelou a seleção|não autorizado|cancelado/i.test(textoNegado),
-    textoNegado.match(/[^\n]*(cancelou|autoriz)[^\n]*/i)?.[0]?.slice(0, 80) ?? "sem aviso",
+    /cancelou a seleção|não autorizado|cancelado|permiss/i.test(textoNegado),
+    textoNegado.match(/[^\n]*(cancelou|autoriz|permiss)[^\n]*/i)?.[0]?.slice(0, 90) ?? "sem aviso",
   );
   registrar(
     "permissão negada não deixa a interface 'ao vivo'",
-    !/AO VIVO/.test(textoNegado),
+    !/Ao vivo/.test(textoNegado),
     /AO VIVO/.test(textoNegado) ? "mostrou AO VIVO indevidamente" : "estado correto",
   );
   await negCtx.close();
 
   // ============================================ NAVEGADOR SEM SUPORTE
-  const oldCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const oldCtx = await preparar(await browser.newContext({ viewport: { width: 1280, height: 800 } }));
   const old = await oldCtx.newPage();
   await old.addInitScript(() => {
     // Remove a API para simular um navegador antigo ou contexto não seguro.
@@ -175,13 +183,12 @@ try {
   });
   await old.goto(`${APP}/transmitir`, { waitUntil: "domcontentloaded" });
   await old.locator("#display-name").fill("Teste");
-  await old.getByRole("button", { name: /criar a sala/i }).click();
-  await old.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
+  await old.waitForSelector('[data-campo="link-transmissao"]', { timeout: 25_000 });
   const textoOld = await old.evaluate(() => document.body.innerText);
   registrar(
     "navegador sem suporte é avisado antes de tentar",
-    /não permite capturar a tela|não permite compartilhar/i.test(textoOld),
-    textoOld.match(/[^\n]*não permite[^\n]*/i)?.[0]?.slice(0, 90) ?? "sem aviso",
+    /não sabe capturar a tela|não oferece|não permite/i.test(textoOld),
+    textoOld.match(/[^\n]*não (sabe|permite|oferece)[^\n]*/i)?.[0]?.slice(0, 90) ?? "sem aviso",
   );
   const botaoDesabilitado = await old
     .getByRole("button", { name: /compartilhar minha tela/i })
@@ -192,20 +199,19 @@ try {
   await oldCtx.close();
 
   // ==================================================== RECONEXÃO DO VIEWER
-  const rCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const rCtx = await preparar(await browser.newContext({ viewport: { width: 1280, height: 800 } }));
   const rHost = await rCtx.newPage();
   await rHost.goto(`${APP}/transmitir`, { waitUntil: "domcontentloaded" });
   await rHost.locator("#display-name").fill("Ana");
-  await rHost.getByRole("button", { name: /criar a sala/i }).click();
-  await rHost.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
-  const link2 = await rHost.locator("p.font-mono").first().innerText();
+  await rHost.waitForSelector('[data-campo="link-transmissao"]', { timeout: 25_000 });
+  const link2 = await rHost.locator('[data-campo="link-transmissao"]').inputValue();
   const code2 = link2.match(/\/assistir\/([A-Z0-9]{9})/)?.[1];
 
-  const wCtx = await browser.newContext({ viewport: { width: 1024, height: 700 } });
+  const wCtx = await preparar(await browser.newContext({ viewport: { width: 1024, height: 700 } }));
   const w = await wCtx.newPage();
   await w.goto(`${APP}/assistir/${code2}`, { waitUntil: "domcontentloaded" });
   await rHost.getByRole("button", { name: /compartilhar minha tela/i }).click();
-  await rHost.waitForSelector("text=/AO VIVO/i", { timeout: 30_000 });
+  await rHost.waitForSelector("text=/Ao vivo/i", { timeout: 30_000 });
 
   // Espera o vídeo chegar.
   let chegou = 0;

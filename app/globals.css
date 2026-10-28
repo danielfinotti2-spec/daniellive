@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Identidade visual do ScreenLive.
+ * Identidade visual do DanielLive.
  *
  * A estrutura segue a mesma decisão de arquitetura da referência: em vez de
  * manter centenas de classes `dark:*` espalhadas, repinta-se a própria escala
@@ -71,8 +71,15 @@ body {
   height: 100%;
 }
 
+/*
+ * Só a cor do texto e a fonte ficam aqui.
+ *
+ * O fundo NÃO é definido neste arquivo de propósito: uma regra de `body` fora
+ * de `@layer` vence qualquer utilitário `bg-*` do Tailwind, e aí `bg-zinc-50`
+ * no `<body>` simplesmente não teria efeito. Deixar o fundo para a classe
+ * mantém uma única fonte de verdade e permite que cada página escolha o seu.
+ */
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -316,6 +323,41 @@ body {
 }
 
 /*
+ * Confirmação de que a captura começou.
+ *
+ * Entra deslizando de cima e sai sozinha: aparece no momento em que a tela passa
+ * a ser enviada e some em menos de três segundos, para não virar um selo fixo
+ * sobre o vídeo — o "Ao vivo" permanente já está na faixa de baixo.
+ */
+@keyframes confirmacao-inicio {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  12%,
+  72% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+    visibility: hidden;
+  }
+}
+
+.confirmacao-inicio {
+  animation: confirmacao-inicio 2.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Transição suave do palco entre os estados (parado → capturando → ao vivo). */
+.palco-transicao {
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+/*
  * Nada aqui comunica algo que a forma parada já não diga, então movimento é a
  * primeira coisa a sair para quem pediu menos animação no sistema.
  */
@@ -329,8 +371,20 @@ body {
   .fade-in,
   .toast-enter,
   .skeleton,
+  .palco-transicao,
   .shine::after {
     animation: none;
+  }
+
+  /*
+   * A confirmação de início não pode depender da animação para sair de cena:
+   * sem ela, ficaria presa sobre o vídeo. Aqui ela simplesmente aparece parada
+   * e é escondida pelo próprio estado do palco.
+   */
+  .confirmacao-inicio {
+    animation: none;
+    opacity: 1;
+    visibility: visible;
   }
 
   /* O que sobra mantém o destaque parado, em vez de sumir. */

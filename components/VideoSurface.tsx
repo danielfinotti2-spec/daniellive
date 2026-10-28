@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cx } from "@/components/ui";
+import { useTexto } from "@/lib/idioma";
 
 /**
  * Superfície de vídeo.
@@ -81,6 +82,7 @@ export function PalcoVideo({
   className?: string;
 }) {
   const [precisaGesto, setPrecisaGesto] = useState(false);
+  const t = useTexto();
 
   return (
     <div
@@ -115,7 +117,7 @@ export function PalcoVideo({
             </svg>
           </span>
           <p className={cx("font-medium text-white/70", compacto ? "text-xs" : "text-sm")}>
-            {legenda ?? "Nada sendo transmitido agora"}
+            {legenda ?? t.video.vazio}
           </p>
         </div>
       )}
@@ -132,7 +134,7 @@ export function PalcoVideo({
           <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             <path d="M8 5v14l11-7z" />
           </svg>
-          <span className="text-sm font-medium">Clique para iniciar o vídeo</span>
+          <span className="text-sm font-medium">{t.video.iniciar}</span>
         </button>
       )}
 
@@ -141,18 +143,18 @@ export function PalcoVideo({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-2 bg-gradient-to-t from-black/85 to-transparent px-3 py-2">
         <span className="flex min-w-0 items-center gap-2">
           <span className={cx("truncate font-medium text-white", compacto ? "text-xs" : "text-sm")}>
-            {nome || "Sem nome"}
+            {nome || t.comum.semNome}
           </span>
           {papel === "anfitriao" && (
             <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
-              Apresentando
+              {t.comum.apresentando}
             </span>
           )}
         </span>
         {aoVivo && (
           <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-red-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
             <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-white" />
-            Ao vivo
+            {t.video.aoVivo}
           </span>
         )}
       </div>

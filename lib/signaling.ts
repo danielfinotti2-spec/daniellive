@@ -16,8 +16,24 @@ export type SignalingStatus = "conectando" | "conectado" | "reconectando" | "off
 type Listener = (message: ServerMessage) => void;
 type StatusListener = (status: SignalingStatus) => void;
 
-/** De onde vem o WebSocket: variável de ambiente ou a própria origem. */
+/**
+ * De onde vem o WebSocket: variável de ambiente ou a própria origem.
+ *
+ * `NEXT_PUBLIC_*` é substituído pelo Next em tempo de **build**, não de
+ * execução. Isso serve para o site, cujo endereço é fixo, mas não para o
+ * aplicativo desktop: ele escolhe uma porta livre ao abrir e precisa dizer isso
+ * ao cliente já compilado. Por isso há a variável de execução abaixo, que o
+ * aplicativo define antes de a interface carregar.
+ */
 export function signalingUrl(): string {
+  // Definida em tempo de execução pelo aplicativo desktop (ver desktop/main.cjs).
+  // Vem primeiro porque é a informação mais específica: só existe quando o
+  // aplicativo escolheu a porta naquele momento.
+  if (typeof window !== "undefined") {
+    const doApp = (window as { __DANIELLIVE_SIGNAL_URL__?: string }).__DANIELLIVE_SIGNAL_URL__;
+    if (typeof doApp === "string" && doApp.trim()) return doApp.trim();
+  }
+
   const explicit = process.env.NEXT_PUBLIC_SIGNAL_URL?.trim();
   if (explicit) return explicit;
 

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { BotaoCopiar } from "@/components/CopyButton";
+import { useSuporteCaptura, AvisoContextoInseguro } from "@/components/HomeActions";
 import { CampoNome, useNomeGuardado } from "@/components/NameField";
 import { SeloAoVivo, SeloSinalizacao, SeloEspectador, BarraQualidade } from "@/components/StatusBadges";
 import { PalcoVideo } from "@/components/VideoSurface";
@@ -23,15 +24,24 @@ import {
   cx,
 } from "@/components/ui";
 import { useHost } from "@/lib/useHost";
-import { supportsDisplayCapture } from "@/lib/webrtc";
+import { useAplicativo } from "@/lib/desktop";
+import { VoltarAoInicio } from "@/components/VoltarAoInicio";
+import { preencher, useTexto } from "@/lib/idioma";
 import type { CaptureOptions } from "@/lib/webrtc";
 
-const ROTULO_QUALIDADE: Record<CaptureOptions["quality"], string> = {
-  auto: "Automática",
-  "1080p": "1080p (nitidez máxima)",
-  "720p": "720p (equilibrada)",
-  "480p": "480p (economia de banda)",
-};
+/**
+ * A ordem das qualidades no menu.
+ *
+ * Só a ordem mora aqui. O texto de cada uma vem do dicionário, em dois
+ * tamanhos: `qualidadeCurta` para o botão, `qualidadeLonga` para a lista.
+ *
+ * Antes existia uma constante com o texto completo, e o botão mostrava
+ * `.split(" ")[0]` — a primeira palavra. Isso funcionava em português por
+ * acidente: "1080p (nitidez máxima)" começa com o que interessa. Numa tradução
+ * em que o qualificador viesse primeiro, o botão mostraria a palavra errada, e
+ * não haveria erro de compilação para avisar.
+ */
+const QUALIDADES: CaptureOptions["quality"][] = ["auto", "1080p", "720p", "480p"];
 
 /**
  * Sala de controle de quem transmite.
@@ -41,13 +51,17 @@ const ROTULO_QUALIDADE: Record<CaptureOptions["quality"], string> = {
  * faz sentido depois que existe algo para assistir.
  */
 export function HostRoom() {
+  const t = useTexto();
   const [nome, setNome] = useNomeGuardado();
   const host = useHost({ name: nome.trim() || "Apresentador" });
   const [dialogoQualidade, setDialogoQualidade] = useState(false);
 
-  const podeCapturar = useMemo(() => supportsDisplayCapture(), []);
+  const podeCapturar = useSuporteCaptura();
   const nomePronto = nome.trim().length > 0;
   const aoVivo = host.phase === "ao-vivo";
+  const noAplicativo = useAplicativo();
+  /** A captura está sendo pedida agora: o palco dá lugar a um estado de espera. */
+  const abrindoCaptura = host.phase === "criando" && Boolean(host.code);
 
   // Avisa antes de fechar a aba com uma transmissão em andamento: fechar sem
   // querer derrubaria todo mundo que está assistindo.
@@ -63,25 +77,33 @@ export function HostRoom() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      {/*
+        A saída da sala fica acima do título, e não no cabeçalho do site.
+        Durante uma transmissão o cabeçalho encolhe para dar espaço à imagem, e
+        quem está ao vivo precisa de um caminho de volta que não dependa dele —
+        mais ainda no aplicativo, onde não existe botão "voltar" do navegador.
+      */}
+      <VoltarAoInicio />
+
       {/* Cabeçalho da sala */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl dark:text-zinc-50">
-          Sua transmissão
+          {t.transmitir.titulo}
         </h1>
         <SeloAoVivo ativo={aoVivo && !host.pausado} />
         <SeloSinalizacao status={host.status} />
-        {host.pausado && <Selo tom="aviso">Pausada</Selo>}
+        {host.pausado && <Selo tom="aviso">{t.assistir.pausada}</Selo>}
         <Link
           href="/como-funciona"
           className="ml-auto text-sm font-medium text-zinc-500 underline underline-offset-2 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-50"
         >
-          Precisa de ajuda?
+          {t.comum.ajuda}
         </Link>
       </div>
 
       {host.error && (
         <div className="mt-4">
-          <Aviso tom="erro" titulo="Não deu para continuar" aoFechar={host.dismissError}>
+          <Aviso tom="erro" titulo={t.transmitir.erroTitulo} aoFechar={host.dismissError}>
             {host.error}
           </Aviso>
         </div>
@@ -95,32 +117,49 @@ export function HostRoom() {
       )}
       {!podeCapturar && (
         <div className="mt-4">
-          <Aviso tom="erro" titulo="Este navegador não sabe capturar a tela">
-            Compartilhar tela depende de uma API que este navegador não oferece. O Chrome, o Edge e
-            o Firefox no computador funcionam; no celular, só assistir.
+          <Aviso tom="erro" titulo={t.transmitir.semCapturaTitulo}>
+            {t.transmitir.semCapturaTexto}
           </Aviso>
         </div>
       )}
-
+      <AvisoContextoInseguro className="mt-4" />
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Coluna principal */}
         <div className="flex min-w-0 flex-col gap-4">
           <Cartao className="overflow-hidden p-0">
-            <div className="aspect-video w-full bg-black">
+            <div className="relative aspect-video w-full bg-black">
               <PalcoVideo
                 stream={host.localPreview}
                 nome={nome || "Você"}
                 papel="anfitriao"
                 aoVivo={aoVivo && !host.pausado}
                 className="rounded-none"
-                legenda={
-                  host.phase === "parado"
-                    ? host.motivoParada === "navegador"
-                      ? "O navegador encerrou o compartilhamento"
-                      : "Você encerrou a transmissão"
-                    : "Sua tela aparece aqui quando você começar"
-                }
+                legenda={legendaDoPalco(host.phase, host.motivoParada, noAplicativo)}
               />
+
+              {/*
+                Enquanto o seletor de tela está aberto, o palco fica num estado de
+                espera visível. Sem isto, o intervalo entre o clique e a escolha
+                parece que o botão não respondeu — e é justamente o momento em que
+                a pessoa está decidindo se compartilha.
+              */}
+              {abrindoCaptura && (
+                <div className="fade-in pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/55 px-6 text-center">
+                  <Spinner className="h-6 w-6 text-white/70" />
+                  <p className="text-sm font-medium text-white/80">
+                    {noAplicativo
+                      ? t.transmitir.escolhaNoAplicativo
+                      : t.transmitir.escolhaNoNavegador}
+                  </p>
+                  <p className="max-w-sm text-xs text-white/45">
+                    {t.transmitir.nadaCapturadoAntes}
+                  </p>
+                </div>
+              )}
+
+              {/* Confirmação de que a captura começou. Aparece uma vez e sai:
+                  um aviso permanente sobre o vídeo vira estorvo. */}
+              {aoVivo && <SeloInicio />}
             </div>
 
             {/* Barra de controles */}
@@ -129,12 +168,15 @@ export function HostRoom() {
                 <Botao
                   variant="primario"
                   onClick={() => void host.startSharing()}
-                  disabled={!nomePronto}
-                  carregando={host.phase === "criando" && Boolean(host.code)}
+                  // Sem suporte à captura, o clique só produziria um erro que já
+                  // está explicado acima — deixar o botão ativo seria oferecer
+                  // uma ação que não existe.
+                  disabled={!nomePronto || !podeCapturar}
+                  carregando={abrindoCaptura}
                   rotuloCarregando="Abrindo a captura…"
                 >
                   <IconePlay />
-                  {host.phase === "parado" ? "Transmitir de novo" : "Compartilhar minha tela"}
+                  {host.phase === "parado" ? t.transmitir.transmitirDeNovo : t.transmitir.comecar}
                 </Botao>
               ) : (
                 <>
@@ -143,17 +185,17 @@ export function HostRoom() {
                     onClick={host.alternarPausa}
                   >
                     {host.pausado ? <IconePlay /> : <IconePausa />}
-                    {host.pausado ? "Retomar" : "Pausar"}
+                    {host.pausado ? t.transmitir.retomar : t.transmitir.pausar}
                   </Botao>
                   <Botao variant="perigo" onClick={() => host.stopSharing()}>
                     <IconeParar />
-                    Encerrar
+                    {t.transmitir.encerrar}
                   </Botao>
                 </>
               )}
 
               <Menu
-                rotulo="Qualidade do vídeo"
+                rotulo={t.transmitir.qualidade}
                 alinhamento="esquerda"
                 gatilho={({ aberto }) => (
                   <span
@@ -165,7 +207,7 @@ export function HostRoom() {
                     )}
                   >
                     <IconeAjustes />
-                    {ROTULO_QUALIDADE[host.options.quality].split(" ")[0]}
+                    {t.transmitir.qualidadeCurta[host.options.quality]}
                     <IconeSeta />
                   </span>
                 )}
@@ -173,9 +215,9 @@ export function HostRoom() {
                 {(fechar) => (
                   <>
                     <div className="px-2 pb-1 pt-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                      Qualidade do vídeo
+                      {t.transmitir.qualidade}
                     </div>
-                    {(Object.keys(ROTULO_QUALIDADE) as CaptureOptions["quality"][]).map((q) => (
+                    {QUALIDADES.map((q) => (
                       <MenuItem
                         key={q}
                         selecionado={host.options.quality === q}
@@ -184,12 +226,12 @@ export function HostRoom() {
                           fechar();
                         }}
                       >
-                        {ROTULO_QUALIDADE[q]}
+                        {t.transmitir.qualidadeLonga[q]}
                       </MenuItem>
                     ))}
                     <MenuSeparador />
                     <div className="px-2 pb-1 pt-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                      Áudio
+                      {t.transmitir.audio}
                     </div>
                     <MenuItem
                       selecionado={host.options.withAudio}
@@ -198,14 +240,14 @@ export function HostRoom() {
                         fechar();
                       }}
                     >
-                      Incluir o áudio da aba
+                      {t.transmitir.incluirAudioAba}
                     </MenuItem>
                     <MenuSeparador />
                     <MenuItem onClick={() => { setDialogoQualidade(true); fechar(); }}>
-                      Mais detalhes…
+                      {t.transmitir.maisDetalhes}
                     </MenuItem>
                     <p className="px-2 pb-1 pt-2 text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
-                      Vale para a próxima vez que você compartilhar.
+                      {t.transmitir.escolhasValemProxima}
                     </p>
                   </>
                 )}
@@ -216,10 +258,12 @@ export function HostRoom() {
                   <BarraQualidade nivel={nivelDaConexao(host.viewerStates)} />
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">
                     {host.viewers.length === 0
-                      ? "ninguém assistindo"
+                      ? t.transmitir.espectadoresContagem.zero
                       : host.viewers.length === 1
-                        ? "1 assistindo"
-                        : `${host.viewers.length} assistindo`}
+                        ? t.transmitir.espectadoresContagem.one
+                        : preencher(t.transmitir.espectadoresContagem.other, {
+                            n: String(host.viewers.length),
+                          })}
                   </span>
                 </div>
               )}
@@ -229,8 +273,8 @@ export function HostRoom() {
           {/* Link de convite */}
           {(host.code || host.phase === "criando") && (
             <CartaoSecao
-              titulo="Link para convidar"
-              descricao="Quem abrir este endereço entra na sala e passa a ver sua tela."
+              titulo={t.transmitir.linkTitulo}
+              descricao={t.transmitir.linkDica}
               icone={<IconeLink />}
             >
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -238,12 +282,21 @@ export function HostRoom() {
                   readOnly
                   value={host.shareUrl}
                   onFocus={(e) => e.currentTarget.select()}
-                  aria-label="Link da transmissão"
+                  aria-label={t.transmitir.linkTitulo}
+                  /*
+                   * Um gancho estável para os testes.
+                   *
+                   * O `aria-label` acima agora é traduzível, então testar por
+                   * ele amarraria o teste ao português: bastaria alguém abrir o
+                   * app em inglês para o seletor não achar mais o campo. Este
+                   * atributo não muda com o idioma e nem aparece na tela.
+                   */
+                  data-campo="link-transmissao"
                   className="font-mono text-xs"
                 />
                 <BotaoCopiar
                   texto={host.shareUrl}
-                  rotulo="Copiar link"
+                  rotulo={t.transmitir.linkCopiar}
                   variant="primario"
                   className="shrink-0"
                 />
@@ -251,12 +304,12 @@ export function HostRoom() {
               {host.code && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Ou dite só o código:
+                    {t.transmitir.ouDiteCodigo}
                   </span>
                   <span className="rounded-full bg-zinc-200 px-2.5 py-1 font-mono text-xs font-medium tracking-wider text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                     {host.code}
                   </span>
-                  <BotaoCopiar texto={host.code} rotulo="Copiar código" size="sm" />
+                  <BotaoCopiar texto={host.code} rotulo={t.comum.copiarCodigo} size="sm" />
                 </div>
               )}
             </CartaoSecao>
@@ -265,13 +318,13 @@ export function HostRoom() {
           {/* Antes de existir um link, explica o que vai acontecer. */}
           {!host.code && (
             <CartaoSecao
-              titulo="Link para convidar"
-              descricao="O link aparece aqui assim que a sala for criada."
+              titulo={t.transmitir.linkTitulo}
+              descricao={t.transmitir.linkApareceQuando}
               icone={<IconeLink />}
             >
               <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
                 <Spinner className="text-zinc-400" />
-                Criando sua sala…
+                {t.transmitir.criandoSala}
               </div>
             </CartaoSecao>
           )}
@@ -279,25 +332,25 @@ export function HostRoom() {
 
         {/* Coluna lateral */}
         <div className="flex min-w-0 flex-col gap-4">
-          <CartaoSecao
-            titulo="Seu nome"
-            descricao="É o nome que aparece para quem está assistindo."
-          >
+          <CartaoSecao titulo={t.transmitir.nomeTitulo} descricao={t.transmitir.nomeDica}>
             <CampoNome
               valor={nome}
               onChange={setNome}
-              rotulo="Como você quer aparecer"
-              dica={nomePronto ? undefined : "Escreva um nome para poder começar."}
+              rotulo={t.transmitir.nomePlaceholder}
+              dica={nomePronto ? undefined : t.transmitir.nomeObrigatorio}
               autoFoco={!nomePronto}
             />
           </CartaoSecao>
 
           <CartaoSecao
-            titulo="Quem está assistindo"
+            titulo={t.transmitir.espectadores}
             descricao={
               host.viewers.length === 0
-                ? "Ninguém entrou ainda. Envie o link."
-                : `${host.viewers.length} de 32 possíveis.`
+                ? t.transmitir.ninguemAinda
+                : preencher(t.transmitir.espectadoresDe, {
+                    n: String(host.viewers.length),
+                    max: "32",
+                  })
             }
             contagem={host.viewers.length}
           >
@@ -305,7 +358,7 @@ export function HostRoom() {
               <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-300 px-4 py-6 text-center dark:border-zinc-800">
                 <IconePessoas />
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  A lista se preenche conforme as pessoas abrem o link.
+                  {t.transmitir.listaSePreenche}
                 </p>
               </div>
             ) : (
@@ -335,15 +388,42 @@ export function HostRoom() {
 
           <Cartao className="p-4">
             <h3 className="text-sm font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-              Enquanto transmite
+              {t.transmitir.enquantoTransmite}
             </h3>
+            {/*
+              As frases trazem o nome de um botão em destaque, e a posição dele
+              muda entre idiomas. Por isso o texto do dicionário vem com um
+              marcador e é partido nele: o `<strong>` continua envolvendo o nome
+              do botão, na posição que cada língua pedir.
+
+              "Parar de compartilhar" não é nosso: é o rótulo do botão do Chrome,
+              que aparece na barra do navegador. Traduzi-lo apontaria para um
+              botão que não existe com aquele nome.
+            */}
             <ul className="mt-2 flex flex-col gap-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              <li>
-                A barra do navegador com o botão <strong className="font-medium">Parar de compartilhar</strong>{" "}
-                encerra a transmissão. O ScreenLive percebe e avisa.
-              </li>
-              <li>Fechar esta aba derruba a transmissão para todo mundo.</li>
-              <li>Pausar interrompe o envio de verdade, sem gastar banda.</li>
+              {noAplicativo ? (
+                <>
+                  <li>
+                    <FraseComBotao
+                      texto={t.transmitir.dicaApp1}
+                      botao={t.transmitir.botaoEncerrar}
+                    />
+                  </li>
+                  <li>{t.transmitir.dicaApp2}</li>
+                  <li>{t.transmitir.dicaPausar}</li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <FraseComBotao
+                      texto={t.transmitir.dicaWeb1}
+                      botao={t.transmitir.botaoPararDeCompartilhar}
+                    />
+                  </li>
+                  <li>{t.transmitir.dicaWeb2}</li>
+                  <li>{t.transmitir.dicaPausar}</li>
+                </>
+              )}
             </ul>
           </Cartao>
         </div>
@@ -369,6 +449,72 @@ function nivelDaConexao(estados: Record<string, RTCPeerConnectionState>): "boa" 
 }
 
 /**
+ * A legenda do palco, uma frase por situação.
+ *
+ * No aplicativo não existe "o navegador encerrou o compartilhamento" — quem
+ * encerra é o próprio aplicativo ou o Windows. Dizer "navegador" ali seria
+ * apontar para um programa que o usuário não está usando.
+ */
+function legendaDoPalco(
+  phase: string,
+  motivo: "usuario" | "navegador" | null,
+  noAplicativo: boolean,
+): string {
+  if (phase === "parado") {
+    if (motivo === "navegador") {
+      return noAplicativo
+        ? "A captura de tela foi encerrada pelo Windows"
+        : "O navegador encerrou o compartilhamento";
+    }
+    return "Você encerrou a transmissão";
+  }
+  return "Sua tela aparece aqui quando você começar";
+}
+
+/**
+ * Confirmação passageira de que a captura começou.
+ *
+ * Um "ao vivo" que já existia antes do clique não informa nada; este aparece
+ * quando o primeiro quadro chega e sai sozinho, sem exigir que ninguém o feche.
+ * A animação é declarada em globals.css e respeita `prefers-reduced-motion`.
+ */
+function SeloInicio() {
+  const t = useTexto();
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+      <span className="confirmacao-inicio inline-flex items-center gap-1.5 rounded-full bg-emerald-600/95 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white" />
+        {t.transmitir.telaCompartilhada}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Uma frase do dicionário com o nome de um botão em destaque.
+ *
+ * O texto chega com um marcador `{botao}`, e é partido nele para que o
+ * `<strong>` envolva exatamente o nome do botão — na posição que o idioma pedir.
+ * Montar a frase concatenando `"O botão " + <strong> + " para a captura"` no
+ * ponto de uso fixaria a ordem do português, e em inglês o nome do botão vem
+ * depois do verbo.
+ *
+ * Se o marcador não existir no texto, a frase sai inteira e sem destaque, em
+ * vez de sumir: um erro de tradução vira texto sem negrito, não texto ausente.
+ */
+function FraseComBotao({ texto, botao }: { texto: string; botao: string }) {
+  const [antes, depois] = texto.split("{botao}");
+  if (depois === undefined) return <>{texto}</>;
+  return (
+    <>
+      {antes}
+      <strong className="font-medium">{botao}</strong>
+      {depois}
+    </>
+  );
+}
+
+/**
  * Diálogo com as opções de captura.
  *
  * Existe porque a escolha de qualidade também precisa de texto de apoio que não
@@ -386,12 +532,16 @@ function DialogoQualidade({
   options: CaptureOptions;
   setOptions: React.Dispatch<React.SetStateAction<CaptureOptions>>;
 }) {
+  // O dicionário vem do hook, e não por prop: o diálogo só existe dentro desta
+  // árvore, e passar o texto inteiro por parâmetro obrigaria cada chamador a
+  // repassá-lo sem usá-lo para nada.
+  const t = useTexto();
   return (
     <Dialogo
       aberto={aberto}
-      aoFechar={aoFechar}
-      titulo="Qualidade e áudio"
-      descricao="Estas escolhas valem para a próxima vez que você compartilhar a tela."
+      onFechar={aoFechar}
+      titulo={t.transmitir.qualidadeEAudio}
+      descricao={t.transmitir.escolhasValemProxima}
       largura="md"
     >
       <div className="flex flex-col gap-5">
@@ -400,11 +550,10 @@ function DialogoQualidade({
             htmlFor="qualidade"
             className="block text-sm font-medium text-zinc-950 dark:text-zinc-50"
           >
-            Resolução
+            {t.transmitir.resolucao}
           </label>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Quanto maior, mais nítido e mais banda consumida por quem assiste. Em uma rede ruim,
-            cair para 720p costuma resolver a travada.
+            {t.transmitir.resolucaoDica}
           </p>
           <Selecao
             id="qualidade"
@@ -414,9 +563,9 @@ function DialogoQualidade({
             }
             className="mt-2"
           >
-            {(Object.keys(ROTULO_QUALIDADE) as CaptureOptions["quality"][]).map((q) => (
+            {QUALIDADES.map((q) => (
               <option key={q} value={q}>
-                {ROTULO_QUALIDADE[q]}
+                {t.transmitir.qualidadeLonga[q]}
               </option>
             ))}
           </Selecao>
@@ -424,17 +573,14 @@ function DialogoQualidade({
 
         <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
           <Interruptor
-            marcado={options.withAudio}
+            checked={options.withAudio}
             onChange={(v) => setOptions((atual) => ({ ...atual, withAudio: v }))}
-            rotulo="Incluir o áudio da aba"
-            descricao="Só funciona ao compartilhar uma aba do navegador. Para uma tela inteira, o áudio do sistema não é capturado."
+            label={t.transmitir.incluirAudioAba}
+            descricao={t.transmitir.audioSoEmAbaApache}
           />
         </div>
 
-        <Aviso tom="info">
-          Na primeira vez, o navegador pergunta o que compartilhar. Dá para trocar depois sem
-          recarregar a página.
-        </Aviso>
+        <Aviso tom="info">{t.transmitir.avisoPrimeiraVez}</Aviso>
       </div>
     </Dialogo>
   );

@@ -14,6 +14,7 @@
 
 import { iceConfig, hasTurn } from "./ice";
 import type { SignalPayload } from "./protocol";
+import type { Dicionario } from "./idioma";
 
 export type CaptureOptions = {
   /** Áudio da aba/sistema quando o navegador oferecer. */
@@ -47,6 +48,14 @@ export class ScreenCaptureError extends Error {
   }
 }
 
+/**
+ * Diz se este navegador sabe capturar a tela.
+ *
+ * É uma pergunta sobre o ambiente, não sobre o React: o servidor não tem
+ * `navigator.mediaDevices`, então ele responde `false` e o navegador responde
+ * a verdade. Para uso durante a renderização, prefira `useSuporteCaptura`, que
+ * resolve essa diferença sem quebrar a hidratação.
+ */
 export function supportsDisplayCapture(): boolean {
   if (typeof navigator === "undefined") return false;
   const md = navigator.mediaDevices;
@@ -321,6 +330,11 @@ export class ViewerPeer {
     this.send(this.hostId, { description: this.pc.localDescription!.toJSON() });
   }
 
+  /** Já foi encerrado: uma oferta nova precisa de uma conexão nova. */
+  get fechado(): boolean {
+    return this.closed;
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -337,14 +351,18 @@ export class ViewerPeer {
   }
 }
 
-/** Texto de diagnóstico para quando a conexão não fecha. */
-export function connectionHelp(): string {
-  if (hasTurn()) {
-    return "Não foi possível conectar. Verifique sua rede e tente novamente.";
-  }
-  return (
-    "Não foi possível conectar direto com o anfitrião. " +
-    "Isso costuma acontecer em redes corporativas ou com firewall rígido — " +
-    "um servidor TURN resolveria (veja NEXT_PUBLIC_TURN_URL no README)."
-  );
+/**
+ * Texto de diagnóstico para quando a conexão não fecha.
+ *
+ * Recebe o dicionário em vez de ler o idioma de um contexto: esta é uma função
+ * pura, chamada de dentro de um tratador de evento — não de um componente — e
+ * um hook aqui não funcionaria. O texto vem de quem chama, que já tem o
+ * dicionário em mãos.
+ *
+ * A escolha entre as duas mensagens continua sendo técnica (há TURN
+ * configurado ou não), e por isso mora aqui, não no dicionário: quem traduz não
+ * tem como saber qual das duas se aplica.
+ */
+export function connectionHelp(t: Dicionario): string {
+  return hasTurn() ? t.erro.conexaoComTurn : t.erro.conexaoSemTurn;
 }

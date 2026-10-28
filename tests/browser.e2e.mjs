@@ -16,6 +16,7 @@
 
 import { chromium } from "playwright-core";
 import assert from "node:assert/strict";
+import { preparar } from "./idioma-dos-testes.mjs";
 
 const APP = process.env.APP_URL ?? "http://127.0.0.1:3000";
 const CHROME =
@@ -45,11 +46,13 @@ async function novoContexto(browser, { fakeUi = false, autoCapture = null } = {}
     // então passamos os dois.
     args.push(`--auto-select-desktop-capture-source=${autoCapture}`);
   }
-  return browser.newContext({
-    permissions: ["camera", "microphone"],
-    viewport: { width: 1280, height: 800 },
-    ...(fakeUi ? {} : {}),
-  });
+  return preparar(
+    await browser.newContext({
+      permissions: ["camera", "microphone"],
+      viewport: { width: 1280, height: 800 },
+      ...(fakeUi ? {} : {}),
+    }),
+  );
 }
 
 async function main() {
@@ -73,13 +76,13 @@ async function main() {
 
   try {
     // ================================================================ HOME
-    const homeCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const homeCtx = await preparar(await browser.newContext({ viewport: { width: 1280, height: 900 } }));
     const home = await homeCtx.newPage();
     home.on("pageerror", (e) => erros.push(`home: ${e.message}`));
     await home.goto(APP, { waitUntil: "domcontentloaded" });
 
     const titulo = await home.title();
-    registrar("home carrega com título da marca", /ScreenLive/i.test(titulo), titulo);
+    registrar("home carrega com título da marca", /DanielLive/i.test(titulo), titulo);
 
     const heading = await home.locator("h1").first().innerText();
     registrar("home mostra o título principal", /mostre sua tela/i.test(heading), heading.trim().slice(0, 40));
@@ -109,21 +112,22 @@ async function main() {
     await homeCtx.close();
 
     // ============================================================== HOST
-    const hostCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const hostCtx = await preparar(await browser.newContext({ viewport: { width: 1440, height: 900 } }));
     const host = await hostCtx.newPage();
     host.on("pageerror", (e) => erros.push(`host: ${e.message}`));
     await host.goto(`${APP}/transmitir`, { waitUntil: "domcontentloaded" });
 
-    // Etapa 1: nome.
+    // Ao entrar na página, a sala é criada sozinha; o nome é pedido em paralelo
+    // e só destrava o botão de compartilhar.
     await host.locator("#display-name").fill("Anfitrião Teste");
-    await host.getByRole("button", { name: /criar a sala/i }).click();
 
-    // Etapa 2: a sala é criada e o link aparece.
-    await host.waitForSelector("text=/Código da sala/i", { timeout: 20_000 });
+    // A sala é criada e o link aparece no campo somente-leitura. O seletor usa
+    // o `data-campo`, e não o `aria-label`: o rótulo é traduzível, e testar por
+    // ele amarraria o teste ao idioma em que o aplicativo abrir.
+    await host.waitForSelector('[data-campo="link-transmissao"]', { timeout: 25_000 });
     const linkTexto = await host
-      .locator("p.font-mono")
-      .first()
-      .innerText()
+      .locator('[data-campo="link-transmissao"]')
+      .inputValue()
       .catch(() => "");
     const match = linkTexto.match(/\/assistir\/([A-Z0-9]{9})/);
     registrar("sala é criada com link real", Boolean(match), linkTexto.trim());
@@ -135,31 +139,35 @@ async function main() {
     registrar("servidor registra a sala criada", health.rooms >= 1, `salas=${health.rooms}`);
 
     // ============================================================ VIEWER
-    const viewerCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const viewerCtx = await preparar(await browser.newContext({ viewport: { width: 1280, height: 800 } }));
     const viewer = await viewerCtx.newPage();
     viewer.on("pageerror", (e) => erros.push(`viewer: ${e.message}`));
     await viewer.goto(`${APP}/assistir/${roomCode}`, { waitUntil: "domcontentloaded" });
 
     // Enquanto o anfitrião não transmite, o espectador espera (e diz isso).
     const espera = await viewer
-      .locator("text=/Esperando|Ao vivo|Conectando|Entrando/i")
+      .locator("text=/Esperando|Ao vivo|Aguardando|Conectando|Entrando|ainda não começou/i")
       .first()
       .innerText({ timeout: 15_000 })
       .catch(() => "");
-    registrar("viewer mostra estado de espera", espera.length > 0, espera.trim().slice(0, 50));
+    registrar("viewer mostra estado de espera", espera.length > 0, espera.trim().slice(0, 60));
 
-    // O anfitrião vê o espectador entrar.
-    await host.waitForSelector("text=/Anfitrião Teste|Espectador/i", { timeout: 15_000 }).catch(() => {});
-    const listaTexto = await host
-      .locator("aside")
-      .first()
-      .innerText()
-      .catch(() => "");
-    registrar(
-      "host vê o espectador na sala",
-      /\(1\)|Espectador/.test(listaTexto),
-      listaTexto.replace(/\s+/g, " ").slice(0, 80),
-    );
+    // O anfitrião vê o espectador entrar. Contamos os itens da lista: o texto
+    // do selo de estado muda rápido demais para ser um sinal confiável.
+    let listados = 0;
+    for (let i = 0; i < 30; i += 1) {
+      listados = await host.evaluate(() => {
+        const hdr = [...document.querySelectorAll("h2")].find((x) =>
+          /Quem está assistindo/i.test(x.textContent ?? ""),
+        );
+        if (!hdr) return 0;
+        const secao = hdr.closest("div")?.parentElement?.parentElement;
+        return secao?.querySelectorAll("ul li").length ?? 0;
+      });
+      if (listados >= 1) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    registrar("host vê o espectador na sala", listados >= 1, `${listados} listado(s)`);
 
     // ================================================== TRANSMISSÃO REAL
     const botaoCompartilhar = host.getByRole("button", { name: /compartilhar minha tela/i });
@@ -168,7 +176,8 @@ async function main() {
     // A captura pode falhar em ambiente headless; verificamos o que aconteceu.
     let capturou = false;
     try {
-      await host.waitForSelector("text=/AO VIVO/i", { timeout: 25_000 });
+      // O selo "Ao vivo" só aparece quando a captura está de fato ativa.
+      await host.waitForSelector("text=/Ao vivo/i", { timeout: 25_000 });
       capturou = true;
     } catch {
       const erro = await host
@@ -178,7 +187,7 @@ async function main() {
         .catch(() => "");
       registrar("captura de tela iniciou", false, erro.trim().slice(0, 120) || "sem alerta visível");
     }
-    if (capturou) registrar("captura de tela iniciou", true, "estado AO VIVO");
+    if (capturou) registrar("captura de tela iniciou", true, "estado ao vivo");
 
     // O espectador precisa receber QUADROS, não só "conectado".
     let quadros = 0;
@@ -221,24 +230,26 @@ async function main() {
 
     // ================================================ ENCERRAR E LIMPAR
     if (capturou) {
-      await host.getByRole("button", { name: /parar compartilhamento/i }).click();
+      await host.getByRole("button", { name: /^encerrar$/i }).click();
       // O espectador deve voltar ao estado de espera sozinho.
       const voltou = await viewer
-        .locator("text=/Esperando|transmissão terminou|terminou/i")
+        .locator("text=/Aguardando|transmissão terminou|terminou|ainda não começou/i")
         .first()
         .innerText({ timeout: 15_000 })
         .catch(() => "");
-      registrar("parar transmissão reflete no viewer", voltou.length > 0, voltou.trim().slice(0, 50));
+      registrar("parar transmissão reflete no viewer", voltou.length > 0, voltou.trim().slice(0, 60));
     }
 
     // ============================================================ MOBILE
-    const mob = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      isMobile: true,
-      hasTouch: true,
-      userAgent:
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-    });
+    const mob = await preparar(
+      await browser.newContext({
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      }),
+    );
     const mobPage = await mob.newPage();
     await mobPage.goto(APP, { waitUntil: "domcontentloaded" });
     const semScrollH = await mobPage.evaluate(
@@ -260,7 +271,7 @@ async function main() {
     await mob.close();
 
     // ======================================================== 404 DA SALA
-    const ruim = await browser.newContext();
+    const ruim = await preparar(await browser.newContext());
     const pagRuim = await ruim.newPage();
     const resposta = await pagRuim.goto(`${APP}/assistir/CODIGOINVALIDO`, {
       waitUntil: "domcontentloaded",
@@ -269,7 +280,7 @@ async function main() {
     await ruim.close();
 
     // ============================================ SALA INEXISTENTE (VÁLIDA)
-    const fantasma = await browser.newContext();
+    const fantasma = await preparar(await browser.newContext());
     const pagFantasma = await fantasma.newPage();
     await pagFantasma.goto(`${APP}/assistir/ZZZZZZZZZ`, { waitUntil: "domcontentloaded" });
     // Espera o estado terminal aparecer: enquanto a conexão abre, a página

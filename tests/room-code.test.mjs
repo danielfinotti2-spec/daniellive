@@ -50,7 +50,7 @@ describe("normalizeRoomCode", () => {
   });
 
   test("extrai de um ws de deep link do app", () => {
-    assert.equal(normalizeRoomCode(`screenlive://assistir/${CODE}`), CODE);
+    assert.equal(normalizeRoomCode(`daniellive://assistir/${CODE}`), CODE);
   });
 
   test("troca O por 0 e I por 1 quando o alfabeto não os tem", () => {

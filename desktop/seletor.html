@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline';"
+    />
+    <title>Escolha o que compartilhar</title>
+    <style>
+      /*
+       * A identidade visual do aplicativo, repetida aqui em vez de importada.
+       * Esta janela vive fora do Next (é carregada antes de a interface existir
+       * e precisa abrir mesmo se o servidor local falhar), então não pode
+       * depender do CSS do site. Os valores são os mesmos de app/globals.css.
+       */
+      :root {
+        --fundo: #101014;
+        --cartao: #1a1a1f;
+        --elevado: #232329;
+        --borda: #313139;
+        --borda-forte: #43434d;
+        --texto: #e9e9ec;
+        --texto-fraco: #a1a1aa;
+        --azul: #2563eb;
+        --azul-claro: #3b82f6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--fundo);
+        color: var(--texto);
+        font-family: "Segoe UI", system-ui, Arial, sans-serif;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--borda);
+        background: #14141a;
+        flex-shrink: 0;
+      }
+
+      .marca {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, var(--azul), #1d4ed8);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      header p {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: var(--texto-fraco);
+      }
+
+      .abas {
+        display: flex;
+        gap: 6px;
+        padding: 12px 18px 0;
+        flex-shrink: 0;
+      }
+
+      .aba {
+        appearance: none;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--texto-fraco);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+      }
+
+      .aba:hover {
+        background: var(--elevado);
+        color: var(--texto);
+      }
+
+      .aba[aria-selected="true"] {
+        background: var(--elevado);
+        border-color: var(--borda-forte);
+        color: var(--texto);
+      }
+
+      .aba:focus-visible,
+      .item:focus-visible,
+      .botao:focus-visible {
+        outline: 2px solid var(--azul-claro);
+        outline-offset: 2px;
+      }
+
+      main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 18px;
+      }
+
+      .grade {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grade.telas {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      }
+
+      .grade.janelas {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      }
+
+      .item {
+        appearance: none;
+        text-align: left;
+        border: 1px solid var(--borda);
+        background: var(--cartao);
+        border-radius: 12px;
+        padding: 8px;
+        cursor: pointer;
+        color: inherit;
+        font: inherit;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: border-color 140ms ease, background 140ms ease;
+      }
+
+      .item:hover {
+        border-color: var(--borda-forte);
+        background: #202027;
+      }
+
+      .item[data-escolhido="true"] {
+        border-color: var(--azul);
+        box-shadow: 0 0 0 1px var(--azul);
+      }
+
+      .miniatura {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        border-radius: 8px;
+        background: #000;
+        object-fit: contain;
+        display: block;
+      }
+
+      .rotulo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .rotulo img {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      .nome {
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        border-top: 1px solid var(--borda);
+        background: #14141a;
+        flex-shrink: 0;
+      }
+
+      .dica {
+        font-size: 12px;
+        color: var(--texto-fraco);
+        min-width: 0;
+      }
+
+      .acoes {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .botao {
+        appearance: none;
+        border: 1px solid var(--borda-forte);
+        background: var(--elevado);
+        color: var(--texto);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 7px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .botao:hover {
+        background: #2b2b33;
+      }
+
+      .botao.primario {
+        background: var(--azul);
+        border-color: var(--azul);
+        color: #fff;
+      }
+
+      .botao.primario:hover {
+        background: #1d4ed8;
+      }
+
+      .botao:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .vazio {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        color: var(--texto-fraco);
+        font-size: 13px;
+      }
+
+      /* Rolagem fina, como no site. */
+      main::-webkit-scrollbar {
+        width: 8px;
+      }
+      main::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      main::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      main::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
+        background-clip: content-box;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .item {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="marca" aria-hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">
+          <rect x="2.5" y="4" width="15" height="11" rx="1.6" />
+          <path d="M6.5 19h7" />
+          <circle cx="19" cy="17" r="2.6" fill="#fff" stroke="none" />
+        </svg>
+      </span>
+      <div>
+        <h1>Escolha o que compartilhar</h1>
+        <p>Quem estiver na sala vê apenas o que você escolher aqui.</p>
+      </div>
+    </header>
+
+    <div class="abas" role="tablist" aria-label="Tipo de fonte">
+      <button class="aba" role="tab" id="aba-telas" aria-selected="true" data-tipo="screen">
+        Telas inteiras
+      </button>
+      <button class="aba" role="tab" id="aba-janelas" aria-selected="false" data-tipo="window">
+        Janelas
+      </button>
+    </div>
+
+    <main id="lista" role="tabpanel" aria-labelledby="aba-telas"></main>
+
+    <footer>
+      <span class="dica" id="dica">Escolha uma tela para começar.</span>
+      <div class="acoes">
+        <button class="botao" id="cancelar">Cancelar</button>
+        <button class="botao primario" id="confirmar" disabled>Compartilhar</button>
+      </div>
+    </footer>
+
+    <script>
+      /*
+       * Recebe a lista do processo principal e devolve a escolha, sempre pela
+       * ponte exposta em preload-seletor.cjs. Não há acesso ao Node aqui: a
+       * janela roda isolada e só enxerga `window.seletor`.
+       */
+      const ponte = window.seletor;
+
+      let fontes = [];
+      let tipo = "screen";
+      let escolhido = null;
+
+      const lista = document.getElementById("lista");
+      const dica = document.getElementById("dica");
+      const confirmar = document.getElementById("confirmar");
+
+      function render() {
+        const visiveis = fontes.filter((f) => f.tipo === tipo);
+        lista.innerHTML = "";
+
+        if (visiveis.length === 0) {
+          const vazio = document.createElement("div");
+          vazio.className = "vazio";
+          vazio.textContent =
+            tipo === "screen"
+              ? "Nenhuma tela encontrada."
+              : "Nenhuma janela encontrada. Abra a janela que quer compartilhar e tente de novo.";
+          lista.appendChild(vazio);
+          return;
+        }
+
+        const grade = document.createElement("div");
+        grade.className = "grade " + (tipo === "screen" ? "telas" : "janelas");
+
+        for (const fonte of visiveis) {
+          const botao = document.createElement("button");
+          botao.className = "item";
+          botao.type = "button";
+          botao.dataset.escolhido = String(fonte.id === escolhido);
+          botao.setAttribute("aria-pressed", String(fonte.id === escolhido));
+
+          if (fonte.miniatura) {
+            const img = document.createElement("img");
+            img.className = "miniatura";
+            img.src = fonte.miniatura;
+            img.alt = "";
+            botao.appendChild(img);
+          }
+
+          const rotulo = document.createElement("span");
+          rotulo.className = "rotulo";
+          if (fonte.icone) {
+            const ic = document.createElement("img");
+            ic.src = fonte.icone;
+            ic.alt = "";
+            rotulo.appendChild(ic);
+          }
+          const nome = document.createElement("span");
+          nome.className = "nome";
+          nome.textContent = fonte.nome;
+          rotulo.appendChild(nome);
+          botao.appendChild(rotulo);
+
+          botao.addEventListener("click", () => {
+            escolhido = fonte.id;
+            dica.textContent = "Compartilhando: " + fonte.nome;
+            confirmar.disabled = false;
+            render();
+          });
+          // Duplo clique confirma direto, que é o atalho que as pessoas tentam.
+          botao.addEventListener("dblclick", () => {
+            escolhido = fonte.id;
+            ponte.escolher(escolhido);
+          });
+
+          grade.appendChild(botao);
+        }
+        lista.appendChild(grade);
+      }
+
+      document.querySelectorAll(".aba").forEach((aba) => {
+        aba.addEventListener("click", () => {
+          tipo = aba.dataset.tipo;
+          document.querySelectorAll(".aba").forEach((outra) => {
+            outra.setAttribute("aria-selected", String(outra === aba));
+          });
+          lista.setAttribute("aria-labelledby", aba.id);
+          render();
+        });
+      });
+
+      confirmar.addEventListener("click", () => {
+        if (escolhido) ponte.escolher(escolhido);
+      });
+      document.getElementById("cancelar").addEventListener("click", () => {
+        ponte.cancelar();
+      });
+      document.addEventListener("keydown", (evento) => {
+        // Esc cancela, como em qualquer diálogo do sistema.
+        if (evento.key === "Escape") ponte.cancelar();
+        if (evento.key === "Enter" && escolhido) ponte.escolher(escolhido);
+      });
+
+      ponte.aoReceberFontes((dados) => {
+        fontes = dados;
+        // Se não houver telas, abre já na aba de janelas em vez de mostrar vazio.
+        if (!fontes.some((f) => f.tipo === "screen") && fontes.some((f) => f.tipo === "window")) {
+          tipo = "window";
+          document.getElementById("aba-telas").setAttribute("aria-selected", "false");
+          document.getElementById("aba-janelas").setAttribute("aria-selected", "true");
+        }
+        render();
+      });
+    </script>
+  </body>
+</html>

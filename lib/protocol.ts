@@ -28,11 +28,10 @@ export type ClientMessage =
   | { type: "create"; name?: string }
   | { type: "join"; code: string; name?: string }
   | { type: "leave" }
-  | { type: "sharing"; on: boolean }
+  | { type: "sharing"; on: boolean; paused?: boolean }
   | { type: "signal"; to: string; data: SignalPayload }
   | { type: "requestStream" }
-  | { type: "ping" }
-  | { type: "chatsend"; text: string };
+  | { type: "ping" };
 
 /** Sinal WebRTC: ou uma descrição de sessão, ou um candidato ICE. */
 export type SignalPayload = {
@@ -58,12 +57,11 @@ export type ServerMessage =
   | { type: "peer-left"; id: string; name: string; timeout?: boolean }
   | { type: "host-changed"; hostId: string; hostName: string }
   | { type: "host-left"; code: string }
-  | { type: "sharing"; id: string; on: boolean }
-  | { type: "sharing-ok"; on: boolean }
+  | { type: "sharing"; id: string; on: boolean; paused?: boolean }
+  | { type: "sharing-ok"; on: boolean; paused?: boolean }
   | { type: "viewers"; viewers: { id: string; name: string }[] }
   | { type: "stream-requested"; from: string; name: string }
   | { type: "signal"; from: string; data: SignalPayload }
-  | { type: "chat"; id: string; from: string; fromId: string; text: string; at: number }
   | { type: "no-host"; code: string }
   | { type: "error"; code: string }
   | { type: "pong"; t: number }

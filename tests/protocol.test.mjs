@@ -166,7 +166,9 @@ describe("decode", () => {
   });
 
   test("recusa acima do teto de tamanho", () => {
-    const grande = JSON.stringify({ type: "chat", text: "x".repeat(MAX_MESSAGE_BYTES) });
+    // O preenchimento é o que empurra a mensagem além do teto; o tipo em si é
+    // irrelevante para esta checagem.
+    const grande = JSON.stringify({ type: "ping", pad: "x".repeat(MAX_MESSAGE_BYTES) });
     const res = decode(grande);
     assert.equal(res.ok, false);
     assert.equal(res.reason, "mensagem-grande");
@@ -183,21 +185,34 @@ describe("decode", () => {
   });
 
   test("encode e decode são inversos", () => {
-    const msg = { type: "chat", from: "Ana", text: "olá ç ã é" };
+    const msg = { type: "sharing", on: true, paused: false, nota: "olá ç ã é" };
     assert.deepEqual(decode(encode(msg)).value, msg);
   });
 });
 
-describe("chatsend", () => {
-  test("recusa texto vazio ou enorme", () => {
-    assert.equal(validateMessage({ type: "chatsend", text: "" }).ok, false);
-    assert.equal(validateMessage({ type: "chatsend", text: "x".repeat(501) }).ok, false);
-    assert.equal(validateMessage({ type: "chatsend" }).ok, false);
+describe("sharing", () => {
+  test("exige o campo booleano `on`", () => {
+    assert.equal(validateMessage({ type: "sharing" }).ok, false);
+    assert.equal(validateMessage({ type: "sharing", on: "sim" }).ok, false);
   });
 
-  test("aceita e apara texto normal", () => {
-    const res = validateMessage({ type: "chatsend", text: "  oi  " });
+  test("aceita `on` sem `paused` e assume não pausado", () => {
+    const res = validateMessage({ type: "sharing", on: true });
     assert.equal(res.ok, true);
-    assert.equal(res.message.text, "oi");
+    assert.equal(res.message.on, true);
+    // O padrão precisa ser `false`: assumir pausado por omissão faria toda
+    // transmissão recém-iniciada aparecer pausada para quem assiste.
+    assert.equal(res.message.paused, false);
+  });
+
+  test("preserva `paused` quando informado", () => {
+    const res = validateMessage({ type: "sharing", on: true, paused: true });
+    assert.equal(res.ok, true);
+    assert.equal(res.message.paused, true);
+  });
+
+  test("recusa `paused` que não seja booleano", () => {
+    assert.equal(validateMessage({ type: "sharing", on: true, paused: "sim" }).ok, false);
+    assert.equal(validateMessage({ type: "sharing", on: true, paused: 1 }).ok, false);
   });
 });

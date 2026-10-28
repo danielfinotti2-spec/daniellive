@@ -12,11 +12,56 @@ import {
   type LocalCapture,
 } from "./webrtc";
 import type { Participant, SignalPayload } from "./protocol";
+import { useIdioma, dicionario } from "./idioma";
 
 export type HostPhase = "criando" | "pronto" | "ao-vivo" | "parado" | "erro";
 
 /** Por que a transmissão foi encerrada — muda o que a interface diz. */
 export type MotivoParada = "usuario" | "navegador" | null;
+
+/**
+ * Liga ou desliga o envio de vídeo de uma conexão sem desanexar a faixa.
+ *
+ * A pausa usa `RTCRtpSender.setParameters` com `encoding.active`, e não
+ * `replaceTrack(null)`: desanexar a faixa descarta o estado do codificador e o
+ * decodificador do outro lado passa a esperar por um quadro-chave que nunca
+ * chega — na prática, a imagem congela para sempre ao retomar. Com `active`, o
+ * envio para e volta de onde estava, e a banda cai a quase zero enquanto isso.
+ *
+ * A faixa continua anexada de propósito: é o que permite retomar sem
+ * renegociar a conexão.
+ */
+function aplicarPausa(peer: HostPeer, pausado: boolean): void {
+  for (const sender of peer.pc.getSenders()) {
+    if (sender.track?.kind !== "video") continue;
+    try {
+      const params = sender.getParameters();
+      if (!params.encodings || params.encodings.length === 0) {
+        // Alguns navegadores só expõem `encodings` depois de haver tráfego.
+        params.encodings = [{}];
+      }
+      for (const encoding of params.encodings) {
+        encoding.active = !pausado;
+      }
+      void sender.setParameters(params).catch(() => {
+        /* parâmetro recusado: a pausa continua valendo na interface */
+      });
+    } catch {
+      /* `getParameters` indisponível: nada a fazer além de seguir */
+    }
+  }
+}
+
+/**
+ * Aplica a pausa a uma conexão recém-criada.
+ *
+ * Necessário porque `peer.start()` anexa a faixa já ativa: ao entrar alguém
+ * enquanto a transmissão está pausada, a conexão nova começaria enviando vídeo,
+ * contrariando o estado que vale para a transmissão inteira.
+ */
+function aplicarPausaAoSender(peer: HostPeer): void {
+  aplicarPausa(peer, true);
+}
 
 /**
  * Toda a lógica de quem apresenta.
@@ -30,6 +75,23 @@ export function useHost({ name }: { name: string }) {
   const peersRef = useRef<Map<string, HostPeer>>(new Map());
   const captureRef = useRef<LocalCapture | null>(null);
 
+  /*
+   * O idioma numa ref, atualizado por um efeito.
+   *
+   * As mensagens nascem em callbacks de eventos do WebSocket e no `onended` da
+   * captura — todos registrados uma vez e vivos depois. Fechar sobre o
+   * dicionário do primeiro render faria a próxima mensagem sair no idioma
+   * antigo depois de uma troca.
+   *
+   * A escrita fica num efeito, e não no corpo do render: escrever numa ref
+   * durante a renderização é impuro, e o lint do projeto recusa — com razão.
+   */
+  const idioma = useIdioma();
+  const idiomaRef = useRef(idioma);
+  useEffect(() => {
+    idiomaRef.current = idioma;
+  }, [idioma]);
+
   const [status, setStatus] = useState<SignalingStatus>("offline");
   const [phase, setPhase] = useState<HostPhase>("criando");
   const [code, setCode] = useState<string | null>(null);
@@ -40,7 +102,6 @@ export function useHost({ name }: { name: string }) {
   const [localPreview, setLocalPreview] = useState<MediaStream | null>(null);
   const [hasAudio, setHasAudio] = useState(false);
   const [viewerStates, setViewerStates] = useState<Record<string, RTCPeerConnectionState>>({});
-  const [chat, setChat] = useState<{ id: string; from: string; text: string; at: number }[]>([]);
   /**
    * Pausa o envio sem encerrar a captura.
    *
@@ -134,6 +195,11 @@ export function useHost({ name }: { name: string }) {
       peersRef.current.set(viewerId, peer);
       try {
         await peer.start(capture.stream);
+        // Se a transmissão já estava pausada quando este espectador entrou, a
+        // conexão recém-criada nasceria enviando vídeo — e a pausa, que vale
+        // para a transmissão inteira, seria furada justamente para quem chegou
+        // depois. Reaplicar aqui mantém o estado coerente para todos.
+        if (pausadoRef.current) aplicarPausaAoSender(peer);
       } catch {
         peer.close();
         peersRef.current.delete(viewerId);
@@ -144,27 +210,30 @@ export function useHost({ name }: { name: string }) {
   /**
    * Alterna a pausa do envio.
    *
-   * Só mexe no canal do transmissor de cada conexão: a captura continua viva e
-   * a faixa continua anexada, então retomar é instantâneo e não dispara de novo
-   * o pedido de permissão da tela. Desligar a faixa (`track.enabled`) faria o
-   * navegador enviar quadros pretos, gastando a mesma banda — por isso o que
-   * mexemos é o `sender`.
+   * A faixa **continua anexada** ao transmissor; o que muda é o parâmetro
+   * `active` da codificação. Essa distinção é o que faz a pausa ser reversível:
+   * remover a faixa (`replaceTrack(null)`) descarta o estado do codificador, e
+   * ao devolvê-la o decodificador do outro lado espera por um quadro-chave que
+   * não chega — a imagem fica congelada para sempre, mesmo com a conexão de pé.
+   *
+   * Desligar a faixa (`track.enabled`) também não serve: o navegador continuaria
+   * enviando quadros, agora pretos, gastando a mesma banda. `active = false`
+   * interrompe a codificação de verdade, sem mexer no SDP.
    */
   const alternarPausa = useCallback(() => {
     const proximo = !pausadoRef.current;
     pausadoRef.current = proximo;
+
     for (const peer of peersRef.current.values()) {
-      for (const sender of peer.pc.getSenders()) {
-        if (sender.track?.kind === "video") {
-          // `replaceTrack(null)` interrompe o envio de verdade sem renegociar
-          // SDP, que é o que causaria um novo pedido de permissão em alguns
-          // navegadores.
-          void sender.replaceTrack(proximo ? null : (captureRef.current?.videoTrack ?? null));
-        }
-      }
+      aplicarPausa(peer, proximo);
     }
+
+    // `on` continua true: pausar não encerra a transmissão. Mandar `on: false`
+    // aqui faria o servidor e os espectadores entenderem que tudo acabou, e
+    // retomar viraria um "começar de novo" — que é justamente o que a pausa
+    // existe para evitar.
+    clientRef.current?.send({ type: "sharing", on: true, paused: proximo });
     setPausado(proximo);
-    clientRef.current?.send({ type: "sharing", on: !proximo, paused: proximo });
   }, []);
 
   /** Atalho estável, usado pela interface (botão de parar, lista de viewers). */
@@ -208,8 +277,8 @@ export function useHost({ name }: { name: string }) {
         case "join-error": {
           setError(
             message.code === "sala-cheia"
-              ? "A sala atingiu o limite de espectadores."
-              : "Não foi possível criar a sala. Tente novamente.",
+              ? dicionario(idiomaRef.current).erro.salaCheia
+              : dicionario(idiomaRef.current).erro.salaNaoCriada,
           );
           setPhase("erro");
           break;
@@ -263,13 +332,6 @@ export function useHost({ name }: { name: string }) {
               (v) => known.get(v.id) ?? { id: v.id, name: v.name, role: "viewer" as const },
             );
           });
-          break;
-        }
-        case "chat": {
-          setChat((current) => [
-            ...current.slice(-49),
-            { id: message.id, from: message.from, text: message.text, at: message.at },
-          ]);
           break;
         }
         case "error": {
@@ -335,18 +397,14 @@ export function useHost({ name }: { name: string }) {
       }
     } catch (err) {
       if (err instanceof ScreenCaptureError && err.kind === "cancelado") {
-        setNotice("Você cancelou a seleção de tela. Nada foi transmitido.");
+        setNotice(dicionario(idiomaRef.current).erro.capturaCancelada);
         return;
       }
-      setError(err instanceof Error ? err.message : "Não foi possível iniciar a captura.");
+      setError(
+        err instanceof Error ? err.message : dicionario(idiomaRef.current).erro.capturaNaoIniciada,
+      );
     }
   }, [options, stopSharing]);
-
-  const sendChat = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    clientRef.current?.send({ type: "chatsend", text: trimmed });
-  }, []);
 
   const shareUrl = code && typeof window !== "undefined" ? `${window.location.origin}/assistir/${code}` : "";
 
@@ -367,8 +425,6 @@ export function useHost({ name }: { name: string }) {
     startSharing,
     stopSharing,
     shareUrl,
-    chat,
-    sendChat,
     /** Pausa/retoma o envio sem derrubar a captura. */
     pausado,
     alternarPausa,

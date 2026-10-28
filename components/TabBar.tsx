@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "@/components/ui";
+import { useTexto } from "@/lib/idioma";
 
 /**
  * Barra inferior do celular.
@@ -16,18 +17,26 @@ import { cx } from "@/components/ui";
  * uma barra fixa por cima de um vídeo rouba altura de quem está assistindo.
  */
 export function TabBar() {
+  const t = useTexto();
   const caminho = usePathname();
   if (caminho.startsWith("/assistir") || caminho.startsWith("/transmitir")) return null;
 
+  /*
+    Rótulos curtos por necessidade de espaço: a barra cabe em 390px de largura
+    com três abas, e em inglês e espanhol as palavras são mais longas que em
+    português ("Transmitir" → "Go live" / "Emitir" já é o limite confortável,
+    "Ajuda" → "Help" / "Ayuda"). Antes de encompridar qualquer rótulo, confira
+    a largura num celular estreito.
+  */
   const abas = [
-    { href: "/", rotulo: "Início", Icone: IconeCasa },
-    { href: "/transmitir", rotulo: "Transmitir", Icone: IconeTransmitir },
-    { href: "/como-funciona", rotulo: "Ajuda", Icone: IconeInterrogacao },
+    { href: "/", rotulo: t.nav.inicio, Icone: IconeCasa },
+    { href: "/transmitir", rotulo: t.nav.transmitir, Icone: IconeTransmitir },
+    { href: "/como-funciona", rotulo: t.nav.ajudaCurto, Icone: IconeInterrogacao },
   ];
 
   return (
     <nav
-      aria-label="Navegação principal"
+      aria-label={t.nav.navegacaoPrincipal}
       className="sticky bottom-0 z-30 border-t border-black/5 bg-zinc-50/95 backdrop-blur-md dark:border-white/5 dark:bg-black/90 lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >

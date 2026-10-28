@@ -6,8 +6,15 @@ node_modules/
 # Build do Next
 .next/
 out/
-build/
 dist/
+
+# Ícones do aplicativo — são versionados de propósito: o instalador precisa
+# deles, e são gerados por `npm run icone` mas não devem depender disso.
+!build/
+!build/**
+
+# Build do aplicativo desktop (instaladores ficam aqui)
+dist-desktop/
 
 # Ambiente — nunca versionar credenciais
 .env
@@ -43,3 +50,8 @@ next-env.d.ts
 # Playwright (usado só nos testes de navegador)
 test-results/
 playwright-report/
+
+# Restos de inicializacao/rascunhos locais
+Liveshare/
+screnLive/
+*.bak
