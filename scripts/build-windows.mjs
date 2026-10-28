@@ -344,9 +344,14 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
     // Na primeira rodada, empacota tudo (win) — os três alvos. A partir da
     // segunda, só o NSIS, e a partir do app JÁ EMPACOTADO na pasta anterior
     // (`--prepackaged`), o que deixa a nova tentativa bem mais rápida.
+    //
+    // `--publish never`: rodando num CI com uma tag, o electron-builder
+    // decide "ajudar" publicando na GitHub Release por conta própria — e aqui
+    // quem publica é o action-gh-release do workflow. Sem o `never`, a tag
+    // o faz exigir GH_TOKEN no meio do empacotamento.
     const args =
       tentativa === 1
-        ? ["--win", "--config", configDeSaida]
+        ? ["--win", "--config", configDeSaida, "--publish", "never"]
         : [
             "--win",
             "nsis",
@@ -354,6 +359,8 @@ const configDeSaida = path.join(dirDeSaida, "electron-builder.config.cjs");
             winUnpacked,
             "--config",
             configDeSaida,
+            "--publish",
+            "never",
           ];
 
     const { codigo } = rodar("npx", ["electron-builder", ...args]);

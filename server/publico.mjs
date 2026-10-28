@@ -23,6 +23,17 @@ import { criarSinal } from "./index.mjs";
 const PORTA = Number(process.env.PORT ?? 3000);
 const HOSPEDEIRO = process.env.HOST ?? "0.0.0.0";
 
+/**
+ * Zero-config no Render: a plataforma injeta `RENDER_EXTERNAL_URL` com a URL
+ * pública do serviço (https://seu-app.onrender.com). Se o operador não pôs
+ * ALLOWED_ORIGINS à mão, a própria URL vira a lista — senão o primeiro
+ * deploy morreria na trava de segurança até alguém copiar a URL para dentro
+ * do painel. Definida à mão, a variável manda e este fallback nem aparece.
+ */
+if (!process.env.ALLOWED_ORIGINS && process.env.RENDER_EXTERNAL_URL) {
+  process.env.ALLOWED_ORIGINS = process.env.RENDER_EXTERNAL_URL;
+}
+
 // O Next servido embutido: dev:false lê o .next já compilado (o buildCommand
 // da hospedagem roda `npm run build` antes de subir este arquivo).
 const app = next({ dev: false, dir: process.cwd() });
