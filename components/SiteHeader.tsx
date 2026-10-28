@@ -109,6 +109,25 @@ export function SiteHeader() {
             <span className="hidden md:inline">{t.nav.download}</span>
           </Link>
 
+          {/* A aba da conta. No celular ela sai do topo: a barra do rodapé já
+              tem a Conta como aba completa, e mais um ícone aqui estouraria a
+              linha nos 390px. A partir de sm ela aparece com o resto. */}
+          <Link
+            href="/conta"
+            aria-current={caminho === "/conta" ? "page" : undefined}
+            aria-label={t.nav.contaRotulo}
+            title={t.nav.contaRotulo}
+            className={cx(
+              "hidden sm:inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
+              caminho === "/conta"
+                ? "font-medium text-zinc-950 dark:text-zinc-50"
+                : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
+            )}
+          >
+            <IconePessoa />
+            <span className="hidden md:inline">{t.nav.conta}</span>
+          </Link>
+
           {/* No celular a ajuda some: ela é leitura, e as duas abas acima são
               escolha. Numa barra apertada, o que informa a decisão fica. */}
           <Link
@@ -194,6 +213,16 @@ function IconeEntrar() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+    </svg>
+  );
+}
+
+function IconePessoa() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      {/* Busto de pessoa: cabeça + ombros, o ícone universal de "conta". */}
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20c1-3.4 3.7-5 7.2-5s6.2 1.6 7.2 5" />
     </svg>
   );
 }

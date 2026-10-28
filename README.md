@@ -495,10 +495,62 @@ Todas são opcionais em desenvolvimento. Copie `.env.example` para `.env.local`.
 | `NEXT_PUBLIC_TURN_URL` | — | URL do TURN (`turn:` ou `turns:`) |
 | `NEXT_PUBLIC_TURN_USERNAME` | — | Usuário do TURN |
 | `NEXT_PUBLIC_TURN_CREDENTIAL` | — | Credencial do TURN |
+| `DANIELLIVE_DB` | `./dados/daniellive.db` | Arquivo do banco (contas, sessões, amizades). O aplicativo desktop aponta para a pasta de dados do usuário; no servidor, o padrão já funciona |
+| `GOOGLE_CLIENT_ID` | — | **Opcional.** ID do cliente OAuth do Google. Sem ele, o botão "Entrar com o Google" simplesmente não aparece |
+| `GOOGLE_CLIENT_SECRET` | — | **Opcional.** Segredo do mesmo cliente OAuth |
+| `NEXT_PUBLIC_SITE_URL` | origem do pedido | Origem pública do site usada no `redirect_uri` do Google — só precisa existir atrás de proxy |
 
 > As variáveis `NEXT_PUBLIC_*` são **embutidas no bundle do cliente** por definição — é
 > inevitável, o navegador precisa delas para montar o ICE. Use credenciais **efêmeras**
 > para o TURN, nunca uma credencial de longa duração com banda aberta.
+
+---
+
+## Contas, amizades e chat
+
+O resto do DanielLive funciona **sem conta**. A aba **Conta** existe para uma coisa:
+guardar amigos — e ela só existe configurada em quem hospeda.
+
+### Banco de dados
+
+É um arquivo SQLite embutido (`node:sqlite`, nenhum serviço para instalar). O caminho é
+`DANIELLIVE_DB`, caindo em `./dados/daniellive.db` se a variável não existir. Ao abrir, o
+banco aplica sozinho as migrações que faltam — atualizar a versão do DanielLive em cima de
+um banco velho não precisa de script. Senhas usam `scrypt` com sal individual; sessões são
+tokens opacos cujo cookie leva o token e o banco só guarda o hash SHA-256.
+
+> **Importante sobre amizades:** conta e amizade vivem no servidor que hospeda o site.
+> Uma conta em `meusite.com` não conversa com conta em `outro.place` — são "planetas"
+> diferentes. No aplicativo desktop, a conta é **local àquela máquina** (o banco fica na
+> pasta de dados do usuário).
+
+### Chat da sala
+
+O chat mora **dentro da sala**: só texto (até 500 caracteres), sem conta, com o nome que a
+pessoa pôs na sala. O servidor guarda as últimas 100 mensagens para quem entra depois, e
+**destrói tudo junto com a sala** — é a mesma regra de "nada fica gravado" do resto do
+produto. A autoria de cada mensagem é aproveitada da própria conexão (não dá para fingir
+ser outra pessoa), e porcaria em rajada encontra o rate limit.
+
+### Entrar com o Google (opcional)
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e um
+   **ID de cliente OAuth** do tipo "Aplicativo Web".
+2. Em **URIs de redirecionamento autorizados**, adicione
+   `https://SEU-DOMINIO/api/auth/google/callback`.
+3. Defina as variáveis no servidor:
+   ```bash
+   GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxx
+   ```
+4. Reinicie o servidor. O botão **"Continuar com o Google"** aparece na aba Conta. Sem
+   essas variáveis, o botão fica escondido de propósito — melhor botão nenhum do que um
+   que leva a um trâmite quebrado.
+
+O fluxo é OAuth padrão feito à mão: `/api/auth/google` emite um `state` (cookie httpOnly,
+verificado no retorno — bloqueio de CSRF de login), o callback troca o `code` por tokens e
+confirma e-mail e nome no endpoint oficial `userinfo`. Contas do Google não guardam senha
+local.
 
 ---
 
@@ -615,6 +667,34 @@ ALLOWED_ORIGINS=https://daniellive.exemplo.com
 > aceitar tudo em silêncio — uma configuração insegura que não avisa nunca é corrigida.
 >
 > Use `ALLOWED_ORIGINS=*` apenas atrás de um proxy que já faça essa checagem.
+
+---
+
+## Publicar o projeto no GitHub
+
+1. **Primeira vez — login** (uma vez por máquina):
+   ```bash
+   gh auth login
+   ```
+2. **Apontar e enviar o código**:
+   ```bash
+   git remote set-url origin https://github.com/danielfinotti2-spec/daniellive.git
+   git push -u origin main
+   ```
+3. **Lançar uma versão com instaladores para baixar** — a tag dispara o workflow
+   [`.github/workflows/release.yml`](.github/workflows/release.yml), que monta o
+   NSIS + MSI + portátil no Windows e publica na aba
+   [Releases](https://github.com/danielfinotti2-spec/daniellive/releases):
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+4. **Atualizar o botão de download do site** — depois da release existir de
+   verdade, trocar em `lib/marca.ts`: `DOWNLOAD.confirmado: true` e a URL do
+   instalador (`https://github.com/danielfinotti2-spec/daniellive/releases/latest`).
+   Os tamanhos exibidos saem dos arquivos em `dist-desktop/` (`Get-ChildItem` e
+   copiar os MB). Só depois disso o site mostra o botão — link errado é pior que
+   link nenhum.
 
 ---
 
@@ -893,6 +973,11 @@ O que já está implementado:
 Sobre privacidade: **a mídia não passa pelo servidor.** A imagem viaja em SRTP entre os
 navegadores, pela conexão WebRTC. O servidor vê apenas metadados de sinalização (quem está
 em qual sala, quando alguém começou a transmitir). Nada é gravado em disco.
+
+> **Exceção e recuo:** com a aba Conta, um arquivo SQLite (`dados/daniellive.db` é o
+> padrão web; no aplicativo, a pasta de dados do usuário) passa a existir para contas,
+> sessões e amizades. Isso é intencional e local — a sala e o chat **continuam sem gravar
+> nada**: a sala vive em memória e o histórico do chat morre com ela.
 
 ### Pendências de segurança para produção
 

@@ -33,7 +33,7 @@ export type Usuario = {
 };
 
 /** Amizade já aceita, com a parte do amigo pronta para mostrar. */
-export type Amigo = { id: string; nome: string; email: string };
+export type Amigo = { id: string; nome: string; email: string; relacaoId: number };
 
 /** Pedido pendente recebido: quem pede, e quando. */
 export type PedidoAmizade = { id: number; deId: string; nome: string; email: string; quando: string };
@@ -210,7 +210,7 @@ function usuarioPorEmail(email: string): Usuario | null {
 }
 
 /** Manda o pedido. Duplicatas viram erro suave; pedido inverso vira amizade. */
-export function enviarPedido(deId: string, paraEmail: string): Resultado<null> {
+export function enviarPedido(deId: string, paraEmail: string): Resultado<"pedido" | "aceito"> {
   const quem = usuarioPorEmail(paraEmail);
   if (!quem) return { ok: false, erro: "nao_encontrado" };
   if (quem.id === deId) return { ok: false, erro: "voce_mesmo" };
@@ -223,7 +223,7 @@ export function enviarPedido(deId: string, paraEmail: string): Resultado<null> {
     // A outra pessoa já tinha pedido para mim: as duas intenções existem —
     // aceitar aqui é a resposta natural, não um erro de "já pedido".
     db.prepare("UPDATE amizades SET estado = 'aceita' WHERE id = ?").run(inverso.id);
-    return { ok: true, valor: null };
+    return { ok: true, valor: "aceito" };
   }
 
   try {
@@ -232,7 +232,7 @@ export function enviarPedido(deId: string, paraEmail: string): Resultado<null> {
       quem.id,
       agora(),
     );
-    return { ok: true, valor: null };
+    return { ok: true, valor: "pedido" };
   } catch {
     return { ok: false, erro: "pedido_existente" };
   }
@@ -254,17 +254,22 @@ export function desfazer(donoId: string, relacaoId: number): Resultado<null> {
   return mudou.changes > 0 ? { ok: true, valor: null } : { ok: false, erro: "nao_encontrado" };
 }
 
-/** Lista as amizades aceitas das duas direções. */
+/** Lista as amizades aceitas das duas direções (com o id da relação). */
 export function listarAmigos(usuarioId: string): Amigo[] {
   const linhas = banco()
     .prepare(
-      `SELECT u.id, u.nome, u.email FROM amizades a
+      `SELECT a.id AS relacao_id, u.id, u.nome, u.email FROM amizades a
          JOIN usuarios u ON u.id = CASE WHEN a.de_id = ? THEN a.para_id ELSE a.de_id END
        WHERE (a.de_id = ? OR a.para_id = ?) AND a.estado = 'aceita'
        ORDER BY u.nome`,
     )
     .all(usuarioId, usuarioId, usuarioId) as Array<Record<string, unknown>>;
-  return linhas.map((l) => ({ id: String(l.id), nome: String(l.nome), email: String(l.email) }));
+  return linhas.map((l) => ({
+    id: String(l.id),
+    nome: String(l.nome),
+    email: String(l.email),
+    relacaoId: Number(l.relacao_id),
+  }));
 }
 
 /** Pedidos que ME pediram e ainda esperam resposta. */

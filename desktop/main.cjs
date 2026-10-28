@@ -461,6 +461,11 @@ async function subirServidores() {
     // Origens: o que a janela do Electron usa. Sem isso o servidor recusa a
     // conexão, porque em produção uma lista vazia é tratada como falha.
     ALLOWED_ORIGINS: `http://127.0.0.1:${portaWeb},http://localhost:${portaWeb}`,
+    // O banco das contas NÃO pode morar na pasta de instalação (Program Files
+    // não é gravável sem elevação) nem no diretório do projeto. userData é o
+    // lugar certo do Windows e o único em que a conta sobrevive a
+    // reinstalações.
+    DANIELLIVE_DB: path.join(app.getPath("userData"), "daniellive.db"),
   };
 
   log(`subindo interface em ${urlApp} e sinalização na porta ${portaSinal}`);

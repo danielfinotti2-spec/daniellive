@@ -27,7 +27,8 @@
     "desktop": "electron .",
     "test:desktop": "node tests/desktop.e2e.mjs",
     "build:desktop": "node scripts/build-windows.mjs",
-    "dist": "electron-builder --config electron-builder.config.cjs --win"
+    "dist": "electron-builder --config electron-builder.config.cjs --win",
+    "test:contas": "node tests/contas.e2e.mjs"
   },
   "dependencies": {
     "motion": "^14.7.1",

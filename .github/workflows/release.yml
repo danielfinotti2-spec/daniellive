@@ -1,0 +1,62 @@
+name: Release
+
+# Monta os instaladores do Windows e publica uma GitHub Release.
+#
+# Dois gatilhos:
+#   - tag no formato v* (v1.0.0, v1.1.0…) — é o fluxo normal de lançamento;
+#   - workflow_dispatch — para gerar artefatos de teste sem subir versão
+#     (publica numa release marcada "prerelease" com o nome do SHA).
+#
+# Por que windows-latest: o teste alvo é o Windows e o NSIS/MSI só compilam lá.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# Uma build de cada vez por tag: duplicatas deixam a release com restos.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      # electron-builder só inclui arquivos comitados no pacote final (a pasta
+      # `public/` com a arte do mascote precisa existir de verdade).
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # A interface precisa estar compilada ANTES do empacotamento: o
+      # electron-builder embarca `.next/` pronta, não roda o build.
+      - name: Compilar a interface
+        run: npm run build
+
+      # electron-builder publica direto na GitHub Release quando há GH_TOKEN:
+      # sem ele, o --publish nunca teria acesso para subir os arquivos.
+      - name: Montar os instaladores
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Validação barata antes de entregar --------------------------------
+      # Um instalador NSIS sólido tem posição de bytes coerente com o conteúdo;
+      # o modo mais comum de build quebrado neste projeto produzia ~300 KB.
+      - name: Conferir os artefatos
+        shell: pwsh
+        run: |
+          $exe = Get-Item "dist-desktop/DanielLive-Setup-*.exe" -ErrorAction Stop
+          if ($exe.Length -lt 100MB) { throw "instalador NSIS suspeito: $($exe.Length) bytes" }
+          "  $($exe.Name): $([math]::Round($exe.Length / 1MB)) MB — dentro do esperado"

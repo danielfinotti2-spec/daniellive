@@ -55,3 +55,8 @@ playwright-report/
 Liveshare/
 screnLive/
 *.bak
+
+dados/
+*.db
+*.db-shm
+*.db-wal

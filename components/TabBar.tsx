@@ -31,6 +31,7 @@ export function TabBar() {
   const abas = [
     { href: "/", rotulo: t.nav.inicio, Icone: IconeCasa },
     { href: "/transmitir", rotulo: t.nav.transmitir, Icone: IconeTransmitir },
+    { href: "/conta", rotulo: t.nav.conta, Icone: IconePessoa },
     { href: "/como-funciona", rotulo: t.nav.ajudaCurto, Icone: IconeInterrogacao },
   ];
 
@@ -88,6 +89,16 @@ function IconeInterrogacao() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <circle cx="12" cy="12" r="9" />
       <path d="M9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4v.3M12 17h.01" />
+    </svg>
+  );
+}
+
+function IconePessoa() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      {/* Mesmo busto do ícone da conta no cabeçalho, no peso da barra inferior. */}
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20c1-3.4 3.7-5 7.2-5s6.2 1.6 7.2 5" />
     </svg>
   );
 }
