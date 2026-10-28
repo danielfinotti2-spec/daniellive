@@ -703,16 +703,17 @@ ALLOWED_ORIGINS=https://daniellive.exemplo.com
 Dez camadas, todas executáveis localmente:
 
 ```bash
-npm test                    # 88 testes de unidade (salas, protocolo, rate limit, código, cliente)
-npm run test:signaling      # 12 testes de integração com o servidor real
+npm test                    # 154 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente)
+npm run test:signaling      # 13 testes de integração com o servidor real
 npm run test:browser        # 21 verificações em navegador real (mídia de verdade)
 npm run test:scenarios      # 14 cenários avançados (mesh, reconexão, permissões)
 npm run test:pausa          # 11 verificações de pausa e retomada com mídia real
+npm run test:contas         # 17 verificações: cadastro, sessão, amizade entre duas contas e chat nas duas direções
 npm run test:ui             # 46 verificações de interface e responsividade
 npm run test:visual         # 23 verificações de paleta, tokens e movimento reduzido
 npm run test:geometry       # 30 medições de layout renderizado
 npm run test:desktop        # abre o Electron e testa a interface dentro da janela
-npm run test:packaged       # 24 verificações sobre o aplicativo EMPACOTADO
+npm run test:packaged       # verificações sobre o aplicativo EMPACOTADO
 npm run screenshots         # regenera as imagens deste README
 ```
 

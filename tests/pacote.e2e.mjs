@@ -356,9 +356,13 @@ try {
   const semSessaoGrafica = process.env.CI === "true" || process.env.SEM_INSTALADOR_NSIS === "1";
 
   for (const [rotulo, arquivo, minimoMB, opcional] of [
-    ["o instalador MSI", "DanielLive-1.0.0.msi", 250, false],
-    ["o instalador NSIS", "DanielLive-Setup-1.0.0.exe", 250, semSessaoGrafica],
-    ["o executável portátil", "DanielLive-Portatil-1.0.0.exe", 150, semSessaoGrafica],
+    // Os mínimos acompanham o conteúdo real do pacote (interface compilada +
+    // sinalização + runtime): hoje ~190 MB no NSIS/MSI e ~150 MB no portátil.
+    // O limite existe para pegar um instalador TRUNCADO (a primeira passada
+    // do NSIS gera ~300 KB), então mantém folga abaixo do valor medido.
+    ["o instalador MSI", "DanielLive-1.0.0.msi", 170, false],
+    ["o instalador NSIS", "DanielLive-Setup-1.0.0.exe", 170, semSessaoGrafica],
+    ["o executável portátil", "DanielLive-Portatil-1.0.0.exe", 135, semSessaoGrafica],
   ]) {
     const p = path.join(RAIZ, "dist-desktop", arquivo);
     if (!existsSync(p)) {
