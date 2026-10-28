@@ -137,8 +137,8 @@ export const MASCOTE = {
 export const DOWNLOAD = {
   /** Página de releases, de onde saem todos os instaladores. */
   url: "https://github.com/danielfinotti2-spec/daniellive/releases/latest",
-  /** Enquanto falso, a interface não promete um download que ainda não existe. */
-  confirmado: false,
+  /** A release v1.0.0 existe de verdade no GitHub — o botão pode prometer o download. */
+  confirmado: true,
   /**
    * Os arquivos publicados em cada versão.
    *
