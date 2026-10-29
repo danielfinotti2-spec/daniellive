@@ -22,6 +22,7 @@
     "test:scenarios": "node tests/scenarios.e2e.mjs",
     "test:abertura": "node tests/abertura.mjs",
     "test:abas": "node tests/abas.e2e.mjs",
+    "test:ambiente": "node tests/ambiente.e2e.mjs",
     "test:pacote-servir": "node tests/pacote-servir.mjs",
     "screenshots": "node tests/screenshots.mjs",
     "desktop": "electron .",

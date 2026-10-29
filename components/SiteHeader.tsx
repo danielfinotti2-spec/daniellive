@@ -7,6 +7,8 @@ import { SeletorIdioma } from "@/components/SeletorIdioma";
 import { Mascote } from "@/components/Mascote";
 import { cx } from "@/components/ui";
 import { useTexto } from "@/lib/idioma";
+import { useAplicativo } from "@/lib/desktop";
+import { SITE_PUBLICO } from "@/lib/marca";
 
 /**
  * Barra superior do site.
@@ -23,6 +25,10 @@ import { useTexto } from "@/lib/idioma";
 export function SiteHeader() {
   const caminho = usePathname();
   const t = useTexto();
+  // No aplicativo, duas abas do site deixam de fazer sentido (ver os comentários
+  // nas próprias abas abaixo); o servidor sempre renderiza a versão web e o
+  // cliente corrige na hidratação, sem divergir o HTML.
+  const noApp = useAplicativo();
   // Dentro de uma sala a barra some: é uma tela de transmissão com controles
   // próprios, e navegação por cima de uma chamada ao vivo é mobília que
   // ninguém pediu. O rodapé continua, discreto.
@@ -77,37 +83,63 @@ export function SiteHeader() {
               A altura de 40px (contra 27px do padding sozinho) é para o alvo de
               toque ficar confortável: são as duas abas principais, e errar o
               toque num celular é o defeito mais fácil de introduzir aqui. */}
-          <Link
-            href="/site"
-            aria-current={caminho === "/site" ? "page" : undefined}
-            aria-label={t.nav.siteRotulo}
-            title={t.nav.siteRotulo}
-            className={cx(
-              "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
-              caminho === "/site"
-                ? "font-medium text-zinc-950 dark:text-zinc-50"
-                : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
-            )}
-          >
-            <IconeNavegador />
-            <span className="hidden md:inline">{t.nav.site}</span>
-          </Link>
+          {/* No aplicativo, "Site" não pode ser uma aba interna: levaria para a
+              mesma interface que a pessoa já está vendo. Ali ele vira um link
+              EXTERNO para a página pública — é a informação que só o site tem
+              (como usar pelo navegador, o que é o projeto). No navegador
+              continua sendo a aba de sempre. */}
+          {noApp ? (
+            <a
+              href={SITE_PUBLICO}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t.nav.siteRotulo}
+              title={t.nav.siteRotulo}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm text-zinc-500 transition hover:bg-zinc-200/60 hover:text-zinc-950 sm:px-2.5 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
+            >
+              <IconeNavegador />
+              <span className="hidden md:inline">{t.nav.site}</span>
+              <IconeExterno />
+            </a>
+          ) : (
+            <Link
+              href="/site"
+              aria-current={caminho === "/site" ? "page" : undefined}
+              aria-label={t.nav.siteRotulo}
+              title={t.nav.siteRotulo}
+              className={cx(
+                "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
+                caminho === "/site"
+                  ? "font-medium text-zinc-950 dark:text-zinc-50"
+                  : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
+              )}
+            >
+              <IconeNavegador />
+              <span className="hidden md:inline">{t.nav.site}</span>
+            </Link>
+          )}
 
-          <Link
-            href="/download"
-            aria-current={caminho === "/download" ? "page" : undefined}
-            aria-label={t.nav.downloadRotulo}
-            title={t.nav.downloadRotulo}
-            className={cx(
-              "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
-              caminho === "/download"
-                ? "font-medium text-zinc-950 dark:text-zinc-50"
-                : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
-            )}
-          >
-            <IconeDownload />
-            <span className="hidden md:inline">{t.nav.download}</span>
-          </Link>
+          {/* "Baixar" DENTRO do aplicativo é a pergunta já respondida — o
+              programa está instalado e aberto. A aba sai do menu em vez de
+              levar a pessoa para uma página que oferece o que ela tem nas mãos.
+              No site, onde é a ação que importa, ela continua. */}
+          {!noApp && (
+            <Link
+              href="/download"
+              aria-current={caminho === "/download" ? "page" : undefined}
+              aria-label={t.nav.downloadRotulo}
+              title={t.nav.downloadRotulo}
+              className={cx(
+                "inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm transition sm:px-2.5",
+                caminho === "/download"
+                  ? "font-medium text-zinc-950 dark:text-zinc-50"
+                  : "text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50",
+              )}
+            >
+              <IconeDownload />
+              <span className="hidden md:inline">{t.nav.download}</span>
+            </Link>
+          )}
 
           {/* A aba da conta. No celular ela sai do topo: a barra do rodapé já
               tem a Conta como aba completa, e mais um ícone aqui estouraria a
@@ -185,6 +217,21 @@ function IconeDownload() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
       <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+    </svg>
+  );
+}
+
+/**
+ * A setinha de "abre fora".
+ *
+ * Bem pequena e ao lado do rótulo: dentro do aplicativo, o link do site abre o
+ * navegador, e essa mudança de lugar precisa estar visível antes do clique —
+ * senão a pessoa clica achando que troca de aba e a janela some.
+ */
+function IconeExterno() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 opacity-60">
+      <path d="M7 17 17 7M9 7h8v8" />
     </svg>
   );
 }

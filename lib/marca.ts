@@ -124,6 +124,20 @@ export const MASCOTE = {
 } as const;
 
 /**
+ * O endereço público do DanielLive.
+ *
+ * Serve para o aplicativo instalado abrir a versão web no navegador: lá dentro,
+ * a interface é a mesma que a pessoa já está vendo, então o link para "o site"
+ * precisa apontar para fora, para o endereço de verdade.
+ *
+ * Vem de `NEXT_PUBLIC_SITE_URL` (fixada na publicação) para não ficar presa a um
+ * domínio no código; sem a variável, cai no endereço público atual. É lida no
+ * build, como toda `NEXT_PUBLIC_*` — trocar de domínio pede uma nova compilação.
+ */
+export const SITE_PUBLICO =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://daniellive.onrender.com";
+
+/**
  * Onde o aplicativo para Windows é baixado.
  *
  * Os instaladores passam de 250 MB, então não ficam no repositório — vão para as
