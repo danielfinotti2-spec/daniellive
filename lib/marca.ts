@@ -163,7 +163,7 @@ export const DOWNLOAD = {
   arquivos: [
     {
       id: "instalador",
-      nome: "DanielLive-Setup-1.0.1.exe",
+      nome: "DanielLive-Setup-1.0.2.exe",
       rotulo: "Instalador",
       descricao: "Instala o DanielLive no Windows. Recomendado para a maioria.",
       tamanho: "≈ 190 MB",
@@ -171,7 +171,7 @@ export const DOWNLOAD = {
     },
     {
       id: "portatil",
-      nome: "DanielLive-Portatil-1.0.1.exe",
+      nome: "DanielLive-Portatil-1.0.2.exe",
       rotulo: "Versão portátil",
       descricao: "Não instala nada: abre direto do arquivo. Bom para pen drive.",
       tamanho: "≈ 148 MB",
@@ -179,7 +179,7 @@ export const DOWNLOAD = {
     },
     {
       id: "msi",
-      nome: "DanielLive-1.0.1.msi",
+      nome: "DanielLive-1.0.2.msi",
       rotulo: "Pacote .msi",
       descricao: "Para instalar em rede ou por política de empresa.",
       tamanho: "≈ 188 MB",
