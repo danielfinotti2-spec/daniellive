@@ -1,0 +1,19 @@
+{
+  "name": "daniellive-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot do DanielLive para Discord: publica o link da transmissão quando alguém entra numa call.",
+  "type": "module",
+  "main": "index.mjs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "registrar": "node registrar.mjs"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}

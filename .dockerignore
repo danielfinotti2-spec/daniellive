@@ -1,0 +1,33 @@
+# Contexto de build enxuto.
+#
+# O único Dockerfile do repositório é o do bot (bot/Dockerfile), e ele só
+# precisa de bot/. Sem este arquivo, o contexto levaria o projeto inteiro
+# (node_modules com Next ~290 MB, .next, dados locais, os instaladores do
+# desktop) para o construtor a cada deploy — lento e desnecessário.
+
+node_modules
+.next
+out
+dados
+installer
+dist
+build
+release
+.git
+.github
+*.log
+.env
+.env.local
+*.db
+*.db-journal
+tests
+app
+components
+lib
+electron
+desktop
+public
+resources
+scripts
+server
+docs

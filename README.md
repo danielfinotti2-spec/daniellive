@@ -20,6 +20,8 @@ repositório. Ver [Licenças e origem](#licenças-e-origem).
 - [Aplicativo para Windows](#aplicativo-para-windows)
 - [Arquitetura](#arquitetura)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Salas privadas e anúncio do site](#salas-privadas-e-anúncio-do-site)
+- [Bot para Discord](#bot-para-discord)
 - [Configuração de STUN e TURN](#configuração-de-stun-e-turn)
 - [Implantação](#implantação)
 - [Testes](#testes)
@@ -621,6 +623,32 @@ chama `sinal.rotaAdmin(req, res)` antes de entregar o pedido ao Next.
 
 ---
 
+## Bot para Discord
+
+Existe um bot que liga o Discord ao DanielLive: quando alguém entra num canal de
+voz, ele publica o link da transmissão no chat daquela call e no status do canal.
+Quando a última pessoa sai, o link some.
+
+```bash
+cp bot/env.example .env      # preencha DISCORD_TOKEN e DANIELLIVE_ORIGIN
+npm run bot:registrar        # uma vez, para registrar os comandos slash
+npm run bot                  # liga o bot
+```
+
+Comandos: `/status`, `/link` e `/config` (este último exige **Gerenciar Servidor**).
+
+O bot é um processo separado, **não depende do site estar rodando na mesma máquina**
+e não usa o Next — o `bot/package.json` tem só o `discord.js`, e a imagem de deploy
+fica em ~17 MB em vez de ~350 MB.
+
+Detalhes, comandos, custos de hospedagem e o que o bot **não** faz:
+[`bot/README.md`](bot/README.md).
+
+> Ele **publica um endereço**; não cria sala no DanielLive. A sala nasce quando
+> alguém abre o link, como em qualquer outro acesso.
+
+---
+
 ## Configuração de STUN e TURN
 
 **STUN** (já configurado) resolve a maioria das redes domésticas: descobre o endereço
@@ -794,10 +822,11 @@ ALLOWED_ORIGINS=https://daniellive.exemplo.com
 Dez camadas, todas executáveis localmente:
 
 ```bash
-npm test                    # 192 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente, anúncio)
+npm test                    # 278 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente, anúncio, bot)
 npm run test:signaling      # 13 testes de integração com o servidor real
 npm run test:privadas       # 8 testes: sala privada fora da lista, anúncio por HTTP + WebSocket
 npm run test:anuncio        # 15 verificações em navegador: a faixa aparece sem recarregar, fecha, some ao retirar
+npm run test:bot            # 76 testes do bot do Discord (já incluídos em `npm test`)
 npm run test:browser        # 21 verificações em navegador real (mídia de verdade)
 npm run test:scenarios      # 14 cenários avançados (mesh, reconexão, permissões)
 npm run test:pausa          # 11 verificações de pausa e retomada com mídia real
@@ -843,6 +872,13 @@ automatizar a escolha de tela.
 | `tests/room-code.test.mjs` | Normalização de código, extração de URL, tolerância a caracteres ambíguos |
 | `tests/signaling-client.test.mjs` | Fila de mensagens do cliente: exatamente um `join` por conexão, reenvio após reconexão, descarte de mensagens efêmeras |
 | `tests/signaling.e2e.mjs` | Fluxo completo com servidor real: criar, entrar, sharing, SDP, ICE, saída, e as recusas de segurança |
+| `tests/anuncio.test.mjs` | Validação do anúncio (texto, cor, prazo, URL só http/https) e o quadro que devolve o vigente |
+| `tests/privadas.e2e.mjs` | Sala privada fora da listagem, entrada por código, e a rota administrativa do anúncio ponta a ponta |
+| `tests/anuncio.e2e.mjs` | A faixa aparecendo em Chrome real sem recarregar, fechando, voltando a sumir quando o anúncio é retirado |
+| `tests/bot-nucleo.test.mjs` | Chave de 5 dígitos e unicidade, ciclo de sessão (entrar, esvaziar, voltar), reaproveitamento do link, troca de canal |
+| `tests/bot-comandos.test.mjs` | `/status`, `/link` e `/config`: permissão, resposta efêmera, fora de servidor, e que a configuração não vaza entre servidores |
+| `tests/bot-registrar.test.mjs` | O que é enviado ao Discord ao registrar comandos (rota, verbo, corpo) e as respostas de erro |
+| `tests/bot-env.test.mjs` | Leitura do `.env`, e a regra de que a variável do ambiente **ganha** do arquivo |
 | `tests/browser.e2e.mjs` | Páginas reais em Chrome: captura, **mídia chegando ao espectador** (dimensões e quadros decodificados), estados, mobile, 404 |
 | `tests/scenarios.e2e.mjs` | Três espectadores ao mesmo tempo, saída sem afetar os outros, permissão negada, navegador sem suporte, reconexão após recarga |
 | `tests/pausa.e2e.mjs` | Pausa com mídia real: **zero quadros** durante a pausa, aviso chegando a quem assiste, conexão mantida, e quadros voltando ao retomar |
@@ -863,7 +899,7 @@ automatizar a escolha de tela.
 Medido nesta máquina, em 30/10/2026:
 
 ```
-unidade .............................. 192/192
+unidade .............................. 278/278   (inclui os 76 do bot)
 integração (sinalização) ............. 13/13
 salas privadas + anúncio (WS) ........ 8/8
 anúncio em navegador ................. 15/15
@@ -1160,6 +1196,19 @@ eventos e conceitos do WebRTC, que são padrão da tecnologia).
 Todo o código aqui foi escrito do zero: servidor de sinalização, protocolo, validação,
 limites, cliente WebRTC, páginas e testes.
 
+### Bot do Discord
+
+O conceito do bot (publicar o link da transmissão quando alguém entra numa call, com a
+chave reaproveitada do chat) veio de um repositório de terceiros **sem arquivo de
+licença** — ou seja, todos os direitos reservados. Por isso:
+
+- **nenhuma linha daquele projeto foi copiada**: nem estrutura, nem nomes, nem texto;
+- ele **não é dependência** deste projeto, e o bot funciona sem ele;
+- o que se reaproveitou é a **ideia do produto**, que não é protegida, reimplementada com
+  decisões próprias e documentadas em [`bot/README.md`](bot/README.md) — inclusive as que
+  divergem do original (estado em memória em vez de MongoDB, contagem de pessoas na call
+  em vez de aritmética de entradas e saídas, comandos em português).
+
 ### Aviso sobre marcas
 
 "DanielLive" é o nome deste projeto. **Não há qualquer afiliação com o GoLive, com a
@@ -1177,6 +1226,7 @@ usados aqui de forma que sugira vínculo oficial.
 | TypeScript | Apache-2.0 | tipagem |
 | concurrently | MIT | rodar os dois processos em dev |
 | playwright-core | Apache-2.0 | testes de navegador (dev) |
+| discord.js | Apache-2.0 | bot do Discord (dependência **opcional**, só usada por `bot/`) |
 
 Nenhuma dependência de runtime é copyleft forte. As licenças e atribuições originais são
 preservadas em `node_modules/`.
