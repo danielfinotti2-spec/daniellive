@@ -165,6 +165,10 @@ describe("snapshot", () => {
       "hostId",
       "hostName",
       "participants",
+      // A marca de sala privada entra no snapshot de propósito: quem já está
+      // dentro precisa saber que a sala não aparece na lista pública, para a
+      // interface poder dizer isso em vez de o anfitrião descobrir sozinho.
+      "privada",
       "sharing",
     ]);
     for (const p of snap.participants) {
@@ -330,5 +334,99 @@ describe("chat da sala", () => {
     const hist = reg.chatHistory(room.code);
     hist.length = 0;
     assert.equal(reg.chatHistory(room.code).length, 1, "esvaziar a cópia não apaga o histórico");
+  });
+});
+
+describe("salas privadas e listagem pública", () => {
+  /** Sala com anfitrião e N espectadores, pronta para aparecer na lista. */
+  function salaComGente(reg, { privada = false, anfitriao = "Ana", espectadores = 1 } = {}) {
+    const room = reg.create({ hostName: anfitriao, privada });
+    reg.join(room.code, { id: `${room.code}-host`, name: anfitriao, asHost: true });
+    for (let i = 0; i < espectadores; i += 1) {
+      reg.join(room.code, { id: `${room.code}-v${i}`, name: `Ver ${i}` });
+    }
+    return room;
+  }
+
+  test("sala criada sem a marca não é privada", () => {
+    const reg = new RoomRegistry();
+    assert.equal(reg.create().privada, false);
+    assert.equal(reg.create({ privada: false }).privada, false);
+    assert.equal(reg.create({ privada: "sim" }).privada, false, "só `true` marca de verdade");
+  });
+
+  test("a marca privada chega no snapshot (o cliente precisa saber)", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create({ privada: true });
+    assert.equal(reg.snapshot(room.code).privada, true);
+    const publica = reg.create();
+    assert.equal(reg.snapshot(publica.code).privada, false);
+  });
+
+  test("privada NÃO aparece na lista pública", () => {
+    const reg = new RoomRegistry();
+    salaComGente(reg, { privada: true, anfitriao: "Secreta" });
+    salaComGente(reg, { anfitriao: "Pública" });
+    const lista = reg.listarPublicas();
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].hostName, "Pública");
+  });
+
+  test("quem recebeu o código AINDA ENTRA na privada — é oculta, não fechada", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create({ privada: true });
+    const entrada = reg.join(room.code, { id: "convidado", name: "Convidado" });
+    assert.equal(entrada.ok, true, "privada esconde da lista, não tranca a porta");
+    assert.equal(entrada.participant.role, "host", "o primeiro a entrar é anfitrião");
+  });
+
+  test("sala vazia não é listada", () => {
+    const reg = new RoomRegistry();
+    reg.create({ hostName: "Fantasma" });
+    assert.deepEqual(reg.listarPublicas(), []);
+  });
+
+  test("sala sem anfitrião não é listada", () => {
+    const reg = new RoomRegistry();
+    const room = reg.create({ hostName: "Vazia" });
+    // Entrar e sair deixa a sala com hostId nulo.
+    reg.join(room.code, { id: "h", name: "H", asHost: true });
+    reg.leave(room.code, "h");
+    assert.deepEqual(reg.listarPublicas(), []);
+  });
+
+  test("a contagem de espectadores não inclui o anfitrião", () => {
+    const reg = new RoomRegistry();
+    salaComGente(reg, { espectadores: 3 });
+    const [entrada] = reg.listarPublicas();
+    assert.equal(entrada.viewers, 3, "3 espectadores, não 4 pessoas");
+  });
+
+  test("lista vem com quem tem mais gente primeiro", () => {
+    const reg = new RoomRegistry();
+    salaComGente(reg, { anfitriao: "Sozinha", espectadores: 0 });
+    salaComGente(reg, { anfitriao: "Cheia", espectadores: 5 });
+    salaComGente(reg, { anfitriao: "Média", espectadores: 2 });
+    assert.deepEqual(
+      reg.listarPublicas().map((s) => s.hostName),
+      ["Cheia", "Média", "Sozinha"],
+    );
+  });
+
+  test("a entrada da lista traz o estado da transmissão", () => {
+    const reg = new RoomRegistry();
+    const room = salaComGente(reg);
+    reg.setSharing(room.code, `${room.code}-host`, true);
+    const [entrada] = reg.listarPublicas();
+    assert.equal(entrada.sharing, true);
+    assert.equal(entrada.code, room.code, "o código vai junto: é por ele que se entra");
+  });
+
+  test("a listagem não expõe os ids dos participantes", () => {
+    const reg = new RoomRegistry();
+    salaComGente(reg);
+    const [entrada] = reg.listarPublicas();
+    assert.equal("participants" in entrada, false, "a lista pública não vaza a sala inteira");
+    assert.equal("hostId" in entrada, false);
   });
 });

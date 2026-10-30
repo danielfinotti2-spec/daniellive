@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FaixaAnuncio } from "@/components/FaixaAnuncio";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TabBar } from "@/components/TabBar";
 import { ThemeScript } from "@/components/ThemeScript";
@@ -62,6 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PularParaConteudo />
           <SiteHeader />
           <main id="conteudo" className="flex flex-1 flex-col">
+            {/* A faixa fica DENTRO do `main` e antes do conteúdo da página.
+                Fora dele ela não participava do fluxo flex do `body`: o `main`
+                (`flex-1`) crescia por cima dela e engolia o clique do botão
+                fechar — medido com `elementFromPoint`, que devolvia a própria
+                section da home em vez do botão. Dentro, ela ocupa espaço real
+                e o conteúdo começa abaixo. */}
+            <FaixaAnuncio />
             {children}
           </main>
           <SiteFooter />

@@ -36,6 +36,43 @@ function lerNomeGuardado(): string {
   return window.localStorage.getItem(CHAVE) ?? "";
 }
 
+const CHAVE_PRIVADA = "screenlive-privada";
+
+/** A preferência guardada, sem suspense: `true`/`false`, ou `null` no servidor. */
+export function lerPrivadaGuardada(): boolean | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(CHAVE_PRIVADA) === "1";
+}
+
+/**
+ * Lembra se a última transmissão foi criada como privada.
+ *
+ * A sala é criada na montagem da página, antes de qualquer clique — então a
+ * escolha precisa existir antes da tela aparecer. Guardar entre visitas
+ * resolve o caso real: quem faz reunião interna sempre quer oculta, e quem faz
+ * transmissão pública sempre quer listada; perguntar de novo a cada vez seria
+ * atrito, e errar o padrão seria vazar uma sala que devia estar oculta.
+ *
+ * `inicial` é a preferência lida de forma SÍNCRONA pelo chamador (ver
+ * `lerPrivadaGuardada`) — é ela que vale na criação da sala. O hook só cuida
+ * da mudança durante o uso, e de manter o `localStorage` em dia.
+ */
+export function usePrivadaGuardada(inicial: boolean): [boolean, (v: boolean) => void] {
+  const [valor, setValor] = useState(inicial);
+
+  const definir = (v: boolean) => {
+    setValor(v);
+    try {
+      window.localStorage.setItem(CHAVE_PRIVADA, v ? "1" : "0");
+    } catch {
+      // Sem armazenamento (modo privado do navegador): a escolha vale só
+      // nesta página. Não é motivo para impedir a transmissão.
+    }
+  };
+
+  return [valor, definir];
+}
+
 /**
  * Campo de nome com sugestão e validação.
  *

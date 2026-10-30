@@ -21,12 +21,13 @@
  */
 
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { WebSocketServer } from "ws";
 import { RoomRegistry, isValidRoomCode } from "./rooms.mjs";
 import { validateMessage, decode, encode, PROTOCOL_VERSION } from "./protocol.mjs";
 import { RateLimiter, RoomCreationLimiter, costFor } from "./ratelimit.mjs";
+import { QuadroDeAnuncios, validarAnuncio } from "./anuncio.mjs";
 
 /**
  * Cria o servidor e DEVOLVE as peças; quem escuta e encerra é o chamador.
@@ -77,15 +78,142 @@ const log = (...args) => {
 
 const registry = new RoomRegistry();
 const creationLimiter = new RoomCreationLimiter({ perAddress: 10, windowMs: 60_000 });
+/**
+ * O anúncio do site. Vive aqui (e não em `server/publico.mjs`) porque tanto o
+ * servidor público quanto o aplicativo desktop e os testes sobem por este
+ * arquivo — o aviso precisa existir onde houver sinalização.
+ *
+ * Quem PUBLICA é o operador, por HTTP administrativo (ver `anunciar` abaixo);
+ * o WebSocket só distribui. Isso mantém a única porta de escrita do anúncio
+ * fora do caminho que qualquer navegador pode abrir.
+ */
+const anuncios = new QuadroDeAnuncios();
 
 /** id do participante -> estado da conexão */
 const connections = new Map();
+
+/**
+ * Entrega uma mensagem a toda conexão aberta, de qualquer sala.
+ *
+ * É o único canal "site-wide" do servidor. Usado hoje pelo anúncio; a diferença
+ * em relação a `broadcast` é justamente não depender de sala — o aviso precisa
+ * chegar a quem está na tela de entrada sem estar em transmissão nenhuma.
+ */
+function paraTodos(message) {
+  const payload = encode(message);
+  for (const state of connections.values()) {
+    const socket = state.ws;
+    if (socket && socket.readyState === socket.OPEN) socket.send(payload);
+  }
+}
+
+/**
+ * Publica um anúncio para todo mundo AGORA e passa a devolvê-lo a quem conectar
+ * depois. Devolve `{ ok, anuncio }` ou `{ ok: false, erro }`.
+ *
+ * Fica aqui (e não na rota HTTP) para que o servidor autônomo, o modo público e
+ * os testes usem exatamente a mesma regra de validação e de distribuição.
+ */
+function publicarAnuncio(bruto) {
+  const resultado = validarAnuncio(bruto);
+  if (!resultado.ok) return resultado;
+  const vigente = anuncios.definir(resultado.anuncio);
+  paraTodos({ type: "anuncio", anuncio: vigente });
+  log("anúncio publicado");
+  return { ok: true, anuncio: vigente };
+}
+
+/** Tira o anúncio do ar e avisa quem está conectado. */
+function retirarAnuncio() {
+  anuncios.limpar();
+  paraTodos({ type: "anuncio", anuncio: null });
+  log("anúncio retirado");
+  return { ok: true, anuncio: null };
+}
+
+/**
+ * Trata as rotas administrativas do anúncio. Devolve `true` se respondeu.
+ *
+ * Autenticação: `ANUNCIO_TOKEN` no cabeçalho `authorization: Bearer …`. Sem a
+ * variável definida, as rotas ficam desligadas (404) — um servidor que ninguém
+ * configurou para administrar não deve nem anunciar que existe uma porta de
+ * administração.
+ */
+async function rotaAdmin(req, res) {
+  const token = process.env.ANUNCIO_TOKEN ?? "";
+  if (!token) return false;
+  const caminho = (req.url ?? "").split("?")[0];
+  if (caminho !== "/admin/anuncio") return false;
+
+  const recebido = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
+  // Comparação de tamanho fixo: medir o tempo de resposta não pode revelar
+  // quantos caracteres do token estavam certos.
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(token);
+  const autorizado = a.length === b.length && timingSafeEqual(a, b);
+  if (!autorizado) {
+    res.writeHead(401, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "nao_autorizado" }));
+    return true;
+  }
+
+  if (req.method === "DELETE") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify(retirarAnuncio()));
+    return true;
+  }
+
+  if (req.method !== "POST") {
+    res.writeHead(405, { "content-type": "application/json", allow: "POST, DELETE" });
+    res.end(JSON.stringify({ error: "metodo_nao_permitido" }));
+    return true;
+  }
+
+  // Corpo limitado: um anúncio tem teto de 280 caracteres, então 8 KB é
+  // generosidade que ainda impede qualquer um de empurrar um arquivo inteiro.
+  const MAX_CORPO = 8 * 1024;
+  let bruto = "";
+  let excedeu = false;
+  for await (const pedaco of req) {
+    bruto += pedaco;
+    if (bruto.length > MAX_CORPO) {
+      excedeu = true;
+      break;
+    }
+  }
+  if (excedeu) {
+    res.writeHead(413, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "corpo_longo" }));
+    return true;
+  }
+
+  let corpo;
+  try {
+    corpo = JSON.parse(bruto || "{}");
+  } catch {
+    res.writeHead(400, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "json_invalido" }));
+    return true;
+  }
+
+  const resultado = publicarAnuncio(corpo);
+  res.writeHead(resultado.ok ? 200 : 422, {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+  });
+  res.end(JSON.stringify(resultado));
+  return true;
+}
 
 const EMBUTIDO = httpServer !== null;
 
 let proprio = null;
 if (!EMBUTIDO) {
-  proprio = createServer((req, res) => {
+  proprio = createServer(async (req, res) => {
+    // A rota administrativa vem antes de tudo: ela responde por si e devolve
+    // `true` quando tratou o pedido.
+    if (await rotaAdmin(req, res)) return;
+
     // Endpoint de saúde: usado pelo Docker/orquestrador para saber se o processo
     // está de pé, e por `npm run test:e2e` para esperar o servidor subir.
     if (req.url === "/health" || req.url === "/healthz") {
@@ -191,6 +319,9 @@ wss.on("connection", (ws, req) => {
     id,
     version: PROTOCOL_VERSION,
     limits: { maxViewersPerRoom: 32 },
+    // O anúncio viaja junto do "bem-vindo" para quem conecta no meio de um
+    // aviso não perder o começo dele. `null` quando não há nada em vigor.
+    anuncio: anuncios.ativo(),
   });
   log("conexão", id.slice(0, 8), address);
 
@@ -258,7 +389,7 @@ function handleMessage(ws, state, message) {
       }
       if (state.roomCode) registry.leave(state.roomCode, state.id);
       const name = message.name || state.name || "Anfitrião";
-      const room = registry.create({ hostName: name });
+      const room = registry.create({ hostName: name, privada: message.privada });
       const joined = registry.join(room.code, { id: state.id, name, asHost: true });
       if (!joined.ok) {
         send(ws, { type: "error", code: joined.error });
@@ -272,7 +403,7 @@ function handleMessage(ws, state, message) {
         you: { id: state.id, name, role: "host" },
         room: registry.snapshot(room.code),
       });
-      log("sala criada", room.code, "por", state.id.slice(0, 8));
+      log("sala criada", room.code, "por", state.id.slice(0, 8), message.privada ? "(privada)" : "");
       return;
     }
 
@@ -395,6 +526,29 @@ function handleMessage(ws, state, message) {
       return;
     }
 
+    /**
+     * Lista as salas públicas (ver `listarPublicas` em rooms.mjs).
+     *
+     * Não exige estar em sala: é a tela de entrada pedindo "quem está ao vivo
+     * agora". A resposta inclui o anúncio vigente porque as duas coisas são
+     * perguntadas juntas por quem monta a página, e uma ida a menos ao servidor
+     * é uma chance a menos de a tela abrir pela metade.
+     */
+    case "salas:listar": {
+      send(ws, {
+        type: "salas:lista",
+        salas: registry.listarPublicas(),
+        anuncio: anuncios.ativo(),
+      });
+      return;
+    }
+
+    /** Só o anúncio vigente — para quem já está na página e quer atualizar. */
+    case "anuncio:atual": {
+      send(ws, { type: "anuncio", anuncio: anuncios.ativo() });
+      return;
+    }
+
     case "chat": {
       const code = state.roomCode;
       if (!code) {
@@ -482,6 +636,22 @@ return {
   wss,
   registry,
   connections,
+  /**
+   * As rotas administrativas do anúncio, para quem emprestou o servidor HTTP.
+   *
+   * No modo embutido (servidor público: Next + WebSocket na mesma porta) este
+   * módulo não é dono do servidor e não pode instalar handler próprio. Quem é
+   * dono (server/publico.mjs) chama `await rotaAdmin(req, res)` antes de
+   * delegar ao Next — é o mesmo código do modo autônomo, não uma segunda
+   * implementação que poderia divergir.
+   */
+  rotaAdmin,
+  /** Publica um anúncio para todo mundo (usado por testes e pelo modo público). */
+  publicarAnuncio,
+  /** Retira o anúncio do ar. */
+  retirarAnuncio,
+  /** O quadro de anúncios, para inspeção em teste. */
+  anuncios,
   /** Conveniência autônoma: instala handlers de sinal e escuta. */
   ouvir(porta, hospedeiro) {
     process.on("SIGINT", () => shutdown("SIGINT"));

@@ -195,6 +195,10 @@ const ptBR = {
     descricaoApp: "Você escolhe o que compartilhar e recebe o link na hora.",
     descricaoWeb: "Sem conta, sem instalar nada. Você escolhe o que compartilhar.",
   },
+  /** Faixa de anúncio (`components/FaixaAnuncio.tsx`). */
+  anuncio: {
+    fechar: "Fechar aviso",
+  },
   /** Chat da sala (`components/SalaChat.tsx`): texto da conversa em tempo real. */
   chat: {
     titulo: "Chat da sala",
@@ -456,6 +460,9 @@ const ptBR = {
     nomeDica: "É o nome que aparece para quem está assistindo.",
     nomePlaceholder: "Como você quer aparecer",
     nomeObrigatorio: "Escreva um nome para poder começar.",
+    privada: "Sala privada",
+    privadaDica: "Não aparece na lista de transmissões públicas. Quem tiver o link continua entrando normalmente.",
+    privadaAviso: "Esta sala não está na lista pública.",
     espectadores: "Quem está assistindo",
     ninguemAinda: "Ninguém entrou ainda. Envie o link.",
     listaEnche: "A lista se preenche conforme as pessoas abrem o link.",
@@ -774,6 +781,9 @@ const en: Dicionario = {
     descricaoApp: "You pick what to share and get the link right away.",
     descricaoWeb: "No account, nothing to install. You pick what to share.",
   },
+  anuncio: {
+    fechar: "Dismiss notice",
+  },
   chat: {
     titulo: "Room chat",
     dica: "Messages disappear with the room.",
@@ -1004,6 +1014,9 @@ const en: Dicionario = {
     nomeDica: "This is the name viewers see.",
     nomePlaceholder: "How you want to appear",
     nomeObrigatorio: "Type a name to get started.",
+    privada: "Private room",
+    privadaDica: "It doesn't show up in the public stream list. Anyone with the link can still join.",
+    privadaAviso: "This room isn't in the public list.",
     espectadores: "Who is watching",
     ninguemAinda: "Nobody has joined yet. Send the link.",
     listaEnche: "The list fills up as people open the link.",
@@ -1279,6 +1292,9 @@ const es: Dicionario = {
     descricaoApp: "Tú eliges qué compartir y recibes el enlace al instante.",
     descricaoWeb: "Sin cuenta y sin instalar nada. Tú eliges qué compartir.",
   },
+  anuncio: {
+    fechar: "Cerrar aviso",
+  },
   chat: {
     titulo: "Chat de la sala",
     dica: "Los mensajes desaparecen con la sala.",
@@ -1509,6 +1525,9 @@ const es: Dicionario = {
     nomeDica: "Es el nombre que ven quienes están mirando.",
     nomePlaceholder: "Cómo quieres aparecer",
     nomeObrigatorio: "Escribe un nombre para poder empezar.",
+    privada: "Sala privada",
+    privadaDica: "No aparece en la lista de transmisiones públicas. Quien tenga el enlace sigue entrando normalmente.",
+    privadaAviso: "Esta sala no está en la lista pública.",
     espectadores: "Quién está mirando",
     ninguemAinda: "Todavía no entró nadie. Envía el enlace.",
     listaEnche: "La lista se llena a medida que la gente abre el enlace.",

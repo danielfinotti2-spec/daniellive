@@ -44,13 +44,21 @@ await app.prepare().catch((erro) => {
   process.exit(1);
 });
 
-const servidor = createServer((req, res) => {
+// O servidor HTTP é criado primeiro, mas só passa a escutar no fim: o handler
+// precisa do `sinal` (criado abaixo) para desviar o anúncio administrativo, e
+// o `criarSinal` precisa do servidor para pendurar o upgrade de `/ws` nele.
+// Um `async` aqui resolve a ordem sem uma segunda variável de estado.
+const servidor = createServer(async (req, res) => {
+  // Administração do anúncio: mesma regra do modo autônomo, reaproveitada.
+  // Devolve `false` quando o caminho não é dela — aí o pedido segue para o Next.
+  if (await sinal.rotaAdmin(req, res)) return;
+
   // Saúde/metrics vivem AQUI também: o Render conferir "a porta responde"
   // não deve passar pela pipeline inteira do Next.
   if (req.url === "/health" || req.url === "/healthz") {
     const body = JSON.stringify({
       ok: true,
-      rooms: registry.size,
+      rooms: sinal.registry.size,
       uptime: Math.round(process.uptime()),
     });
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
@@ -59,7 +67,7 @@ const servidor = createServer((req, res) => {
   }
   if (req.url === "/metrics") {
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    res.end(`daniellive_rooms ${registry.size}\n`);
+    res.end(`daniellive_rooms ${sinal.registry.size}\n`);
     return;
   }
   handle(req, res).catch((erro) => {
@@ -74,7 +82,7 @@ const servidor = createServer((req, res) => {
 // Modo embutido: o upgrade de `/ws` vira WebSocket; tudo mais vai para o
 // Next acima. O `criarSinal` é a mesma fábrica que o modo clássico usa —
 // a lógica de salas, chat e limites não se duplica.
-const { registry } = criarSinal({ httpServer: servidor, caminhoWs: "/ws" });
+const sinal = criarSinal({ httpServer: servidor, caminhoWs: "/ws" });
 
 servidor.listen(PORTA, HOSPEDEIRO, () => {
   console.log(`[daniellive] site + sinalização ouvindo em :${PORTA} (WS em /ws)`);

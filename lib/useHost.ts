@@ -71,7 +71,7 @@ function aplicarPausaAoSender(peer: HostPeer): void {
  * desenha `phase`, `viewers` e `error`, e chama `startSharing`/`stopSharing`.
  * Nenhuma regra de WebRTC mora no JSX.
  */
-export function useHost({ name }: { name: string }) {
+export function useHost({ name, privada = false }: { name: string; privada?: boolean }) {
   const clientRef = useRef<SignalingClient | null>(null);
   const peersRef = useRef<Map<string, HostPeer>>(new Map());
   const captureRef = useRef<LocalCapture | null>(null);
@@ -153,6 +153,14 @@ export function useHost({ name }: { name: string }) {
   useEffect(() => {
     nameRef.current = name;
   }, [name]);
+
+  // Mesma ideia para a escolha de sala privada: ela é lida na criação, dentro
+  // de um efeito que roda uma única vez, então precisa de uma ref para não
+  // depender da ordem em que os efeitos rodam.
+  const privadaRef = useRef(privada);
+  useEffect(() => {
+    privadaRef.current = privada;
+  }, [privada]);
 
   /** Texto de estado, para a interface não recalcular rótulos. */
   const canCapture = useMemo(() => supportsDisplayCapture(), []);
@@ -375,7 +383,10 @@ export function useHost({ name }: { name: string }) {
 
     client.connect();
     client.send({ type: "hello", name: nameRef.current, version: 1 });
-    client.send({ type: "create", name: nameRef.current });
+    // `privada` é decidida ANTES da montagem (ver a página do anfitrião): a
+    // sala é criada aqui, uma única vez, e esta escolha não muda depois sem
+    // criar outra sala.
+    client.send({ type: "create", name: nameRef.current, privada: privadaRef.current });
 
     return () => {
       offStatus();

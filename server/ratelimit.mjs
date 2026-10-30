@@ -49,6 +49,11 @@ export const COST_BY_TYPE = {
   // Chat é a porta mais convidativa para spam: custa o dobro de uma ação
   // comum. Conversa normal nunca chega perto do tecido (~1 msg/s sustentada).
   chat: 2,
+  // Listar salas varre o registro inteiro: é a leitura mais cara daqui. Três
+  // unidades impedem que a tela de entrada, se ficar em laço de atualização,
+  // consuma o orçamento de uma conexão normal.
+  "salas:listar": 3,
+  "anuncio:atual": 1,
 };
 
 export function costFor(type) {

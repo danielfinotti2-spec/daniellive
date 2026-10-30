@@ -79,7 +79,7 @@ export class RoomRegistry {
    * uma colisão é improvável, mas "improvável" não é "impossível" e o laço
    * custa nada.
    */
-  create({ hostName = "Anfitrião" } = {}) {
+  create({ hostName = "Anfitrião", privada = false } = {}) {
     let code = generateRoomCode();
     let guard = 0;
     while (this.rooms.has(code)) {
@@ -92,6 +92,17 @@ export class RoomRegistry {
       hostId: null,
       hostName,
       sharing: false,
+      /**
+       * Sala privada: não aparece na lista pública de salas.
+       *
+       * É só uma marcação de visibilidade, não uma fechadura. O código segue
+       * sendo a credencial (como em qualquer sala) e quem recebeu o link entra.
+       * O que muda é que a sala não é descoberta por quem não recebeu o link.
+       * "Privada" é o nome que as pessoas entendem; o comportamento real é
+       * "não listada" — e é assim que o README descreve, para ninguém confiar
+       * nisto como senha.
+       */
+      privada: privada === true,
       // participante -> { id, name, role, isSharing, joinedAt, lastSeen }
       participants: new Map(),
       // Só texto, autor e hora; no máximo MAX_CHAT_HISTORICO entradas.
@@ -252,6 +263,7 @@ export class RoomRegistry {
       hostId: room.hostId,
       hostName: room.hostName,
       hasHost: room.hostId !== null,
+      privada: room.privada,
       participants: [...room.participants.values()].map((p) => ({
         id: p.id,
         name: p.name,
@@ -259,6 +271,44 @@ export class RoomRegistry {
         isSharing: p.isSharing,
       })),
     };
+  }
+
+  /**
+   * As salas que podem ser anunciadas em uma lista pública.
+   *
+   * Duas exclusões, e as duas importam:
+   *
+   *  - **Privadas ficam de fora.** É a razão de existirem: o anfitrião marcou
+   *    "não listar", e listar mesmo assim seria quebrar o combinado.
+   *  - **Salas vazias ou sem anfitrião ficam de fora.** Uma sala sem ninguém
+   *    dentro é um fantasma que dura até o TTL; mostrá-la faria a página
+   *    mentir ("3 salas ao vivo" quando ninguém está transmitindo).
+   *
+   * O código da sala NÃO é ocultado aqui — quem lista precisa dele para
+   * entrar. O que a listagem reduz é a descoberta, não o segredo do código;
+   * quem exibe a lista é que decide o que mostrar (nome do anfitrião, número de
+   * pessoas), e o chamador passa a forma já pronta.
+   */
+  listarPublicas() {
+    const saida = [];
+    for (const room of this.rooms.values()) {
+      if (room.privada) continue;
+      if (room.participants.size === 0 || room.hostId === null) continue;
+      saida.push({
+        code: room.code,
+        hostName: room.hostName,
+        sharing: room.sharing,
+        // O anfitrião não conta como espectador: "3 assistindo" para uma sala
+        // com o apresentador e dois espectadores é o número que a pessoa
+        // espera ler.
+        viewers: Math.max(0, room.participants.size - 1),
+        createdAt: room.createdAt,
+      });
+    }
+    // Mais gente primeiro e, no empate, a mais recente: uma sala movimentada é
+    // o que interessa a quem abre a lista.
+    saida.sort((a, b) => b.viewers - a.viewers || b.createdAt - a.createdAt);
+    return saida;
   }
 
   /**

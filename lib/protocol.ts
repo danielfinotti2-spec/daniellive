@@ -19,19 +19,48 @@ export type RoomSnapshot = {
   hostId: string | null;
   hostName: string;
   hasHost: boolean;
+  /**
+   * Sala fora da lista pública. Obrigatório na tipagem (e não opcional) para
+   * que nenhum lugar da interface esqueça de considerar o caso: quem entra numa
+   * sala oculta precisa ver isso dito, senão o anfitrião fica achando que
+   * apareceu na vitrine.
+   */
+  privada: boolean;
   participants: Participant[];
+};
+
+/** O recado site-wide (ver server/anuncio.mjs). */
+export type Anuncio = {
+  texto: string;
+  cor: "verde" | "vermelho" | "azul";
+  dispensavel: boolean;
+  botao: { rotulo: string; acao: "abrir-nova-aba" | "abrir-mesma-aba" | "recarregar"; url: string | null } | null;
+  /** Data de vencimento (epoch ms) ou `null` para não vencer. */
+  expiraEm: number | null;
+  criadoEm: number;
+};
+
+/** Uma sala pública na vitrine de entrada. */
+export type SalaPublica = {
+  code: string;
+  hostName: string;
+  sharing: boolean;
+  viewers: number;
+  createdAt: number;
 };
 
 /** Mensagens que o cliente envia. */
 export type ClientMessage =
   | { type: "hello"; name?: string; version?: number }
-  | { type: "create"; name?: string }
+  | { type: "create"; name?: string; privada?: boolean }
   | { type: "join"; code: string; name?: string }
   | { type: "leave" }
   | { type: "sharing"; on: boolean; paused?: boolean }
   | { type: "signal"; to: string; data: SignalPayload }
   | { type: "requestStream" }
   | { type: "chat"; texto: string }
+  | { type: "salas:listar" }
+  | { type: "anuncio:atual" }
   | { type: "ping" };
 
 /** Uma mensagem do chat da sala (autor é a sala, não o corpo enviado). */
@@ -55,7 +84,14 @@ export type SignalPayload = {
 
 /** Mensagens que o servidor envia. */
 export type ServerMessage =
-  | { type: "welcome"; id: string; version: number; limits: { maxViewersPerRoom: number } }
+  | {
+      type: "welcome";
+      id: string;
+      version: number;
+      limits: { maxViewersPerRoom: number };
+      /** O anúncio em vigor no momento da conexão, se houver. */
+      anuncio: Anuncio | null;
+    }
   | { type: "hello-ok"; id: string }
   | { type: "created"; code: string; you: Participant; room: RoomSnapshot }
   | {
@@ -82,7 +118,11 @@ export type ServerMessage =
   | { type: "no-host"; code: string }
   | { type: "error"; code: string }
   | { type: "pong"; t: number }
-  | { type: "server-shutdown" };
+  | { type: "server-shutdown" }
+  /** Anúncio publicado ou retirado (`anuncio: null` quando sai do ar). */
+  | { type: "anuncio"; anuncio: Anuncio | null }
+  /** Resposta a `salas:listar`. */
+  | { type: "salas:lista"; salas: SalaPublica[]; anuncio: Anuncio | null };
 
 /** Tradução dos códigos de erro do servidor para o português da interface. */
 export const ERROR_TEXT: Record<string, string> = {

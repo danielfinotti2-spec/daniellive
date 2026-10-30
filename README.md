@@ -499,6 +499,7 @@ Todas são opcionais em desenvolvimento. Copie `.env.example` para `.env.local`.
 | `GOOGLE_CLIENT_ID` | — | **Opcional.** ID do cliente OAuth do Google. Sem ele, o botão "Entrar com o Google" simplesmente não aparece |
 | `GOOGLE_CLIENT_SECRET` | — | **Opcional.** Segredo do mesmo cliente OAuth |
 | `NEXT_PUBLIC_SITE_URL` | origem do pedido | Origem pública do site usada no `redirect_uri` do Google — só precisa existir atrás de proxy |
+| `ANUNCIO_TOKEN` | — | **Opcional.** Token que autoriza publicar/retirar o anúncio do site. Sem ele, a rota `/admin/anuncio` responde 404 |
 
 > As variáveis `NEXT_PUBLIC_*` são **embutidas no bundle do cliente** por definição — é
 > inevitável, o navegador precisa delas para montar o ICE. Use credenciais **efêmeras**
@@ -551,6 +552,72 @@ O fluxo é OAuth padrão feito à mão: `/api/auth/google` emite um `state` (coo
 verificado no retorno — bloqueio de CSRF de login), o callback troca o `code` por tokens e
 confirma e-mail e nome no endpoint oficial `userinfo`. Contas do Google não guardam senha
 local.
+
+---
+
+## Salas privadas e anúncio do site
+
+Duas funcionalidades pensadas para quem organiza transmissões, e não só para quem assiste.
+
+### Sala privada
+
+Na tela de transmissão existe a caixa **"Sala privada"**. Marcada, a sala:
+
+- **não aparece** na listagem pública de salas;
+- **continua acessível** por quem tem o link — privada aqui significa *não listada*, não
+  *fechada*. Não há senha de entrada.
+
+A escolha fica guardada no navegador (`localStorage`, chave `screenlive-privada`) e vale
+para a **próxima** sala; com a transmissão no ar a caixa fica desabilitada, porque trocar
+isso no meio derrubaria quem já está assistindo.
+
+Isso é uma **decisão de arquitetura, não uma promessa de segurança**: o código de 9
+caracteres continua sendo a única credencial (o mesmo modelo de "quem tem o link, entra" do
+resto do produto). Quem precisa de sala realmente fechada precisa de autenticação de
+entrada, que este projeto não tem.
+
+### Anúncio do site
+
+Um recado único, publicado pelo operador, que aparece no topo de **todas** as páginas e
+chega a quem já está conectado **sem recarregar** — inclusive na tela inicial, fora de
+qualquer sala. O caminho é o WebSocket de sinalização, que já é a conexão persistente que
+toda aba mantém.
+
+Para publicar, defina `ANUNCIO_TOKEN` no ambiente e use a rota administrativa:
+
+```bash
+# publicar (fica no ar até ser retirado ou vencer)
+curl -X POST https://SEU-DOMINIO/admin/anuncio \
+  -H "authorization: Bearer $ANUNCIO_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{
+        "texto": "Manutenção hoje às 22h",
+        "cor": "vermelho",
+        "botao": { "rotulo": "Ver detalhes", "url": "https://exemplo.com/status" }
+      }'
+
+# retirar
+curl -X DELETE https://SEU-DOMINIO/admin/anuncio \
+  -H "authorization: Bearer $ANUNCIO_TOKEN"
+```
+
+| Campo | Regra |
+|---|---|
+| `texto` | obrigatório, até 280 caracteres; aceita quebra de linha; recusa caracteres de controle |
+| `cor` | `verde`, `vermelho` ou `azul` (padrão `azul`) |
+| `botao` | opcional; `rotulo` (até 40), `acao` (`abrir-nova-aba`, `abrir-mesma-aba`, `recarregar`) e `url` |
+| `button.url` | só `http`/`https` — `javascript:` e `data:` são recusados, porque esse endereço vira o clique de todo mundo |
+| `expiraEm` | opcional (epoch ms); precisa estar no futuro e dentro de 7 dias |
+| `dispensavel` | padrão `true`; quando `true`, aparece o "×" |
+
+Sem `ANUNCIO_TOKEN` definido, as rotas respondem **404** — um servidor que ninguém
+configurou para administrar não deve nem anunciar que a porta existe. Com ele definido, a
+comparação do token é feita em tempo constante.
+
+A rota administrativa é servida pelo mesmo `criarSinal`, e por isso funciona tanto no modo
+autônomo (`node server/index.mjs`) quanto no modo público de porta única
+(`server/publico.mjs`, o que o Render usa). No modo público, quem é dono do servidor HTTP
+chama `sinal.rotaAdmin(req, res)` antes de entregar o pedido ao Next.
 
 ---
 
@@ -727,12 +794,16 @@ ALLOWED_ORIGINS=https://daniellive.exemplo.com
 Dez camadas, todas executáveis localmente:
 
 ```bash
-npm test                    # 154 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente)
+npm test                    # 192 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente, anúncio)
 npm run test:signaling      # 13 testes de integração com o servidor real
+npm run test:privadas       # 8 testes: sala privada fora da lista, anúncio por HTTP + WebSocket
+npm run test:anuncio        # 15 verificações em navegador: a faixa aparece sem recarregar, fecha, some ao retirar
 npm run test:browser        # 21 verificações em navegador real (mídia de verdade)
 npm run test:scenarios      # 14 cenários avançados (mesh, reconexão, permissões)
 npm run test:pausa          # 11 verificações de pausa e retomada com mídia real
-npm run test:contas         # 17 verificações: cadastro, sessão, amizade entre duas contas e chat nas duas direções
+npm run test:contas         # 19 verificações: cadastro, sessão, amizade entre duas contas e chat nas duas direções
+npm run test:abas           # 32 verificações de navegação, download, celular e idioma
+npm run test:ambiente       # 8 verificações: o menu muda dentro do aplicativo e não muda no site
 npm run test:ui             # 46 verificações de interface e responsividade
 npm run test:visual         # 23 verificações de paleta, tokens e movimento reduzido
 npm run test:geometry       # 30 medições de layout renderizado
@@ -740,6 +811,8 @@ npm run test:desktop        # abre o Electron e testa a interface dentro da jane
 npm run test:packaged       # verificações sobre o aplicativo EMPACOTADO
 npm run screenshots         # regenera as imagens deste README
 ```
+
+`npm run test:anuncio` sobe o próprio servidor numa porta livre (não depende de `npm start`).
 
 Todos, exceto `npm test`, exigem os serviços no ar (`npm start`) e um Chrome instalado
 (`CHROME_PATH` sobrescreve o caminho padrão). O teste de navegador usa
@@ -787,19 +860,27 @@ automatizar a escolha de tela.
 
 ### Resultado da última execução
 
+Medido nesta máquina, em 30/10/2026:
+
 ```
-unidade ............................. 88/88
-integração (sinalização) ............ 12/12
-navegador real (mídia) .............. 21/21
-cenários avançados .................. 14/14
-pausa e retomada .................... 11/11
-interface (smoke) ................... 46/46
-fidelidade visual ................... 23/23
-geometria ........................... 30/30
-aplicativo empacotado ............... 22/22
-                                    ─────────
-                                    267 verificações
+unidade .............................. 192/192
+integração (sinalização) ............. 13/13
+salas privadas + anúncio (WS) ........ 8/8
+anúncio em navegador ................. 15/15
+abas, download e celular ............. 32/32
+idioma ............................... 33/33
+ambiente (site × aplicativo) ......... 8/8
+contas e amizades .................... 19/19
+pausa e retomada ..................... 11/11
+navegador real (mídia) ............... 21/21
+cenários avançados ................... 14/14
+interface (smoke) .................... 46/46
+fidelidade visual .................... 23/23
+geometria ............................ 30/30
 ```
+
+`test:desktop` e `test:packaged` não foram reexecutados depois destas mudanças; os
+números deles nas seções anteriores são da rodada anterior.
 
 As **duas verificações que não rodaram** são as que conferem que o instalador NSIS e o
 executável portátil foram gerados. Elas não rodam no ambiente onde estes testes foram

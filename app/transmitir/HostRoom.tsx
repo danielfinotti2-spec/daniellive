@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BotaoCopiar } from "@/components/CopyButton";
 import { useSuporteCaptura, AvisoContextoInseguro } from "@/components/HomeActions";
-import { CampoNome, useNomeGuardado } from "@/components/NameField";
+import { CampoNome, useNomeGuardado, usePrivadaGuardada, lerPrivadaGuardada } from "@/components/NameField";
 import { SeloAoVivo, SeloSinalizacao, SeloEspectador, BarraQualidade } from "@/components/StatusBadges";
 import { PalcoVideo } from "@/components/VideoSurface";
 import {
@@ -55,7 +55,16 @@ const QUALIDADES: CaptureOptions["quality"][] = ["auto", "1080p", "720p", "480p"
 export function HostRoom() {
   const t = useTexto();
   const [nome, setNome] = useNomeGuardado();
-  const host = useHost({ name: nome.trim() || "Apresentador" });
+  /**
+   * Lida de forma síncrona, antes do primeiro render: a sala é criada na
+   * montagem do `useHost` abaixo, e uma leitura assíncrona chegaria tarde —
+   * a sala já teria nascida visível. No servidor devolve `false`, e o cliente
+   * corrige na hidratação; como a criação da sala só acontece no navegador,
+   * o valor que importa é sempre o do segundo render.
+   */
+  const [privadaInicial] = useState(() => lerPrivadaGuardada() === true);
+  const [privada, setPrivada] = usePrivadaGuardada(privadaInicial);
+  const host = useHost({ name: nome.trim() || "Apresentador", privada });
   const [dialogoQualidade, setDialogoQualidade] = useState(false);
 
   const podeCapturar = useSuporteCaptura();
@@ -345,6 +354,27 @@ export function HostRoom() {
               dica={nomePronto ? undefined : t.transmitir.nomeObrigatorio}
               autoFoco={!nomePronto}
             />
+            {/*
+             * A escolha vale para a PRÓXIMA sala: esta já foi criada ao abrir a
+             * página. O `disabled` só entra quando a transmissão está no ar,
+             * porque aí não dá para trocar sem derrubar quem assiste — e é
+             * melhor dizer isso do que deixar clicar e não acontecer nada.
+             */}
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-emerald-600"
+                checked={privada}
+                disabled={aoVivo}
+                onChange={(e) => setPrivada(e.target.checked)}
+              />
+              <span className="min-w-0">
+                <span className="block font-medium">{t.transmitir.privada}</span>
+                <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+                  {t.transmitir.privadaDica}
+                </span>
+              </span>
+            </label>
           </CartaoSecao>
 
           <CartaoSecao

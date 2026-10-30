@@ -80,6 +80,10 @@ const SCHEMAS = {
   create: {
     validate: (m) => ({
       name: isStr(m.name, MAX_NAME) ? m.name.trim() : null,
+      // Opcional: quem omite cria uma sala listada, como sempre foi. Só um
+      // `true` de verdade marca a sala como privada — string "true" vinda de
+      // um cliente antigo não deve, por acidente, esconder a sala.
+      privada: m.privada === true,
     }),
   },
 
@@ -133,6 +137,15 @@ const SCHEMAS = {
   },
 
   ping: { validate: () => ({}) },
+
+  /**
+   * Pedido de lista de salas públicas. Sem campos: quem pede não escolhe
+   * filtro nenhum, e o servidor já decide o que é público.
+   */
+  "salas:listar": { validate: () => ({}) },
+
+  /** Pedido do anúncio vigente (atualização sob demanda). */
+  "anuncio:atual": { validate: () => ({}) },
 };
 
 /**
