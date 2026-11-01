@@ -116,6 +116,21 @@ npm install
 cp .env.example .env.local   # opcional em desenvolvimento
 ```
 
+> **Este repositório é a fonte única.** Nada de `node_modules`, `.next` ou do banco
+> local é versionado — são artefatos gerados, e ocupam ~1,25 GB. Para reconstruir
+> tudo do zero numa máquina limpa:
+>
+> ```bash
+> git clone https://github.com/danielfinotti2-spec/daniellive.git screenlive
+> cd screenlive
+> npm install       # ~900 MB em node_modules
+> npm run build     # ~340 MB em .next
+> ```
+>
+> Verificado: um clone novo roda `npm test` com **278/278** e `npm run build`
+> com sucesso, sem nenhum arquivo vindo da máquina original. O banco local
+> (`dados/`) nasce vazio e é recriado pelo primeiro cadastro.
+
 ### Desenvolvimento
 
 ```bash
