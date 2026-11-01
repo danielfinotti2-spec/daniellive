@@ -1,0 +1,239 @@
+{
+  "geradoEm": "2026-11-01T23:16:12.305Z",
+  "origem": "dados/daniellive.db (local, criado por testes)",
+  "colunas": {
+    "usuarios": [
+      "id",
+      "email",
+      "nome",
+      "senha_hash",
+      "sal",
+      "provedor",
+      "criado_em",
+      "nascimento",
+      "apelido"
+    ],
+    "amizades": [
+      "id",
+      "de_id",
+      "para_id",
+      "estado",
+      "criado_em"
+    ]
+  },
+  "contagem": {
+    "usuarios": 19,
+    "amizades": 9
+  },
+  "amostra": [
+    {
+      "id": "09a81db4-6ec6-4465-bfed-57e170958736",
+      "email": "ana.1793184121315@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T10:42:03.527Z",
+      "nascimento": null,
+      "apelido": null
+    },
+    {
+      "id": "419f999b-4a8d-47f0-9986-2dd06edc04cd",
+      "email": "bia.1793184121315@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T10:42:05.636Z",
+      "nascimento": null,
+      "apelido": null
+    },
+    {
+      "id": "2e0cfb5e-84b4-4d27-9521-15e3852045fe",
+      "email": "ana.1793184175820@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T10:42:56.843Z",
+      "nascimento": null,
+      "apelido": null
+    },
+    {
+      "id": "e7dc78c9-588f-4c84-a248-6e3165ee3f50",
+      "email": "bia.1793184175820@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T10:42:58.657Z",
+      "nascimento": null,
+      "apelido": null
+    },
+    {
+      "id": "7393aea8-eb1d-475c-90af-b929ff6ae6f0",
+      "email": "jogadorcarone1@gmail.com",
+      "nome": "Jogador Caro",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T11:11:38.328Z",
+      "nascimento": null,
+      "apelido": null
+    },
+    {
+      "id": "4aed4354-00ea-4506-8c01-b2f5b95f35af",
+      "email": "ana.1793190367001@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T12:26:08.233Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "aeaa7a44-07f2-41f8-ae9f-48dea8e34401",
+      "email": "bia.1793190367001@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-28T12:26:10.101Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "04c45620-dee9-4b75-82d6-e60f5c716a06",
+      "email": "ana.1793251042076@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-29T05:17:23.305Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "5e005df7-e90c-4502-8863-99fce0534915",
+      "email": "bia.1793251042076@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-29T05:17:25.530Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "7780e4dc-a116-46aa-bb2f-2bf9d6714f2c",
+      "email": "ana.1793360706122@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:45:07.432Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "04c032f6-0ebd-45cb-aeb5-3a0ff8fcf208",
+      "email": "bia.1793360706122@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:45:09.568Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "3df56dbb-adcc-4757-b7c3-e39a9c214c72",
+      "email": "ana.1793360746320@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:45:47.434Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "63a1d00d-8bf6-444d-81f9-a4bff53b6a18",
+      "email": "bia.1793360746320@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:45:49.587Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "673c779c-f8a8-4462-887b-85db6e27aaf6",
+      "email": "ana.1793360792415@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:46:33.722Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "eb446758-3850-47cd-9306-80e9d88d46bf",
+      "email": "bia.1793360792415@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:46:35.833Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "990d3fdf-3987-458c-8980-d8ab82984ac1",
+      "email": "ana.1793360881010@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:48:02.586Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "f4f65aae-6cb1-4b45-ae3a-ca3824bea71c",
+      "email": "bia.1793360881010@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:48:05.126Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "1c64a4e8-947f-4d63-ab63-156fd1fb71e7",
+      "email": "ana.1793360912908@teste.com",
+      "nome": "Ana Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:48:34.029Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    },
+    {
+      "id": "462642d8-8c64-46b0-a06c-58350256b8ac",
+      "email": "bia.1793360912908@teste.com",
+      "nome": "Bia Conta",
+      "senha_hash": "[removido]",
+      "sal": "",
+      "provedor": "senha",
+      "criado_em": "2026-10-30T11:48:36.072Z",
+      "nascimento": "2004-03-18",
+      "apelido": null
+    }
+  ]
+}
