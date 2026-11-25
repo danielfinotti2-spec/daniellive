@@ -717,6 +717,22 @@ servidor para manter e sem banda de relay no seu host.
 
 ## Implantação
 
+### Altare
+
+Em **Apps → New app → GitHub repository**, use este repositório, Node.js 24,
+instalação `npm ci --ignore-scripts`, build `npm run build` e início
+`node server/publico.mjs` (também declarado no `Procfile`). Site e WebSocket
+compartilham a porta da plataforma, com saúde em `/health`.
+
+`ALTARE_URL` configura automaticamente a origem autorizada no primeiro deploy;
+para domínio próprio, defina `ALLOWED_ORIGINS` explicitamente. O banco atual é
+**SQLite**: para persistir contas em um Docker App, configure **Data folder**
+como `/app/dados`. Os bancos PostgreSQL/MySQL da aba Storage precisam de um
+adaptador de dados — conectar uma `DATABASE_URL` não altera o SQLite sozinho.
+
+Passos completos, comandos Docker e dados necessários para publicar:
+[`docs/altare.md`](docs/altare.md).
+
 ### Render / Railway (hospedagem com porta única)
 
 Hospedagens gerenciadas expõem **uma** porta HTTP. Para elas existe o servidor
@@ -743,14 +759,22 @@ na mesma porta, no caminho `/ws` — e o cliente descobre esse endereço sozinho
 
 ### Docker
 
-O `Dockerfile` produz uma imagem que roda site e sinalização sob o mesmo processo pai:
+O `Dockerfile` roda site e sinalização **na mesma porta**, com WebSocket em
+`/ws`. O volume preserva o SQLite das contas entre recriações do contêiner:
 
 ```bash
 docker build -t daniellive .
-docker run -p 3000:3000 -p 8787:8787 \
+docker run -p 3000:3000 \
+  -v daniellive-dados:/app/dados \
   -e ALLOWED_ORIGINS=https://daniellive.exemplo.com \
   daniellive
 ```
+
+O exemplo pressupõe HTTPS no domínio público por proxy reverso. Para testar
+no navegador em `http://localhost:3000`, compile uma imagem de teste com
+`--build-arg NEXT_PUBLIC_SIGNAL_URL=ws://localhost:3000/ws` e use
+`ALLOWED_ORIGINS=http://localhost:3000`. Variáveis `NEXT_PUBLIC_*` são de build,
+não de execução; `NEXT_PUBLIC_SITE_URL` também aceita `--build-arg`.
 
 ### Atrás de proxy reverso
 
@@ -837,7 +861,8 @@ ALLOWED_ORIGINS=https://daniellive.exemplo.com
 Dez camadas, todas executáveis localmente:
 
 ```bash
-npm test                    # 278 testes de unidade (salas, protocolo, rate limit, chat, DB, contas, código, cliente, anúncio, bot)
+npm test                    # 299 testes de unidade (inclui ambiente de deploy)
+npm run test:public         # 4 testes de produção: HTTP, /ws e SQLite após reiniciar
 npm run test:signaling      # 13 testes de integração com o servidor real
 npm run test:privadas       # 8 testes: sala privada fora da lista, anúncio por HTTP + WebSocket
 npm run test:anuncio        # 15 verificações em navegador: a faixa aparece sem recarregar, fecha, some ao retirar
@@ -858,10 +883,14 @@ npm run screenshots         # regenera as imagens deste README
 
 `npm run test:anuncio` sobe o próprio servidor numa porta livre (não depende de `npm start`).
 
-Todos, exceto `npm test`, exigem os serviços no ar (`npm start`) e um Chrome instalado
-(`CHROME_PATH` sobrescreve o caminho padrão). O teste de navegador usa
-`--auto-select-desktop-capture-source`, que é o mecanismo do próprio Chrome para
-automatizar a escolha de tela.
+`test:public` exige um build (`npm run build`), sobe o próprio servidor numa
+porta livre e usa um banco temporário; não precisa de Chrome. Também aceita
+`DANIELLIVE_TEST_APP_DIR` apontando para uma cópia só com dependências de produção.
+
+Os testes de navegador usam um Chrome instalado (`CHROME_PATH` sobrescreve o
+caminho padrão). Salvo os que sobem seus próprios serviços, execute-os com
+`npm start` no ar. O teste de navegador usa `--auto-select-desktop-capture-source`,
+que é o mecanismo do próprio Chrome para automatizar a escolha de tela.
 
 > **Antes de rodar os testes de navegador, confirme que só existe um servidor em
 > cada porta.** Um `next start` órfão segurando a porta 3000 serve artefatos

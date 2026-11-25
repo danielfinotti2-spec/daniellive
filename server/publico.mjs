@@ -19,20 +19,12 @@
 import { createServer } from "node:http";
 import next from "next";
 import { criarSinal } from "./index.mjs";
+import { configurarAmbientePublico } from "./ambiente.mjs";
 
-const PORTA = Number(process.env.PORT ?? 3000);
-const HOSPEDEIRO = process.env.HOST ?? "0.0.0.0";
-
-/**
- * Zero-config no Render: a plataforma injeta `RENDER_EXTERNAL_URL` com a URL
- * pública do serviço (https://seu-app.onrender.com). Se o operador não pôs
- * ALLOWED_ORIGINS à mão, a própria URL vira a lista — senão o primeiro
- * deploy morreria na trava de segurança até alguém copiar a URL para dentro
- * do painel. Definida à mão, a variável manda e este fallback nem aparece.
- */
-if (!process.env.ALLOWED_ORIGINS && process.env.RENDER_EXTERNAL_URL) {
-  process.env.ALLOWED_ORIGINS = process.env.RENDER_EXTERNAL_URL;
-}
+// Altare fornece PORT (App Hosting) ou SERVER_PORT (servidor tradicional).
+// ALTARE_URL/RENDER_EXTERNAL_URL autorizam a origem pública no primeiro deploy;
+// uma lista ALLOWED_ORIGINS definida pelo operador sempre tem precedência.
+const { porta: PORTA, hospedeiro: HOSPEDEIRO } = configurarAmbientePublico();
 
 // O Next servido embutido: dev:false lê o .next já compilado (o buildCommand
 // da hospedagem roda `npm run build` antes de subir este arquivo).
